@@ -1,0 +1,26 @@
+# Oponn 1.0 configuration file example
+# Anomandaris - February 2015
+
+# This file will be read by Oponn at the start of a new game.
+# Lines beginning with # and blanks are comments and will be ignored by Oponn.
+
+# Oponn has spent many years observing the other Lux agents play. He knows them inside out
+# and will ruthlessly exploit them where possible.
+
+lux_agent_modelling=true
+
+# Oponn looks far ahead into the future. Occasionally he gets lost in the myriad possibilities.
+# Tune his strength by adjusting the number of iterations. The more iterations the stronger he 
+# he plays but will take longer per move. The suggested range is somewhere between 1000-10000.
+# If you happen to be running Lux on a super computer you can get away with much higher values.
+
+iterations=1000
+
+# Number of cores. Set as 'n' to fully utilise the number of cores on your machine.
+
+cores=4
+
+# See into Oponn's mind by turning debug on.
+
+debug=true
+
