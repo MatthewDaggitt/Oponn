@@ -29,7 +29,9 @@ public class SimBoard
 	public enum AttackState {
 		START,
 		EXECUTE,
-		INVADE
+		INVADE,
+		CASH,
+		PLACE,
 	}
 	
 	public static final int DEFENDERS_DESTROYED = 7;
@@ -209,11 +211,6 @@ public class SimBoard
 		setupPhaseGameState(boardState);
 		
 		recalculateContinentBonuses();
-		
-		if(transferCards || !cardProgression.equals("5, 5, 5..."))
-		{
-			throw new IllegalArgumentException("Not programmed for this type of game!");
-		}
 	}
 	
 	protected void setupCountries()
@@ -241,10 +238,7 @@ public class SimBoard
 			playersCards.clear();
 			if(player == currentPlayer)
 			{
-				for(Card card : cardManager.getCardsHeld())
-				{
-					playerCards.get(currentPlayer).add(card);
-				}
+				playerCards.get(currentPlayer).addAll(cardManager.getCardsHeld());
 			}
 			else
 			{
@@ -314,6 +308,8 @@ public class SimBoard
 				
 				setupInitialPlacementPhase();
 				numberOfPlaceableArmies = boardState.numberOfPlaceableArmies;
+				// TO-DO fix when find out how are initial armies are calculated
+				initialArmiesLeftToPlace[currentPlayer] = Math.min(initialArmiesLeftToPlace[currentPlayer], numberOfPlaceableArmies);
 				break;
 				
 			case CARDS: 
@@ -342,6 +338,14 @@ public class SimBoard
 					{
 						remainingPlayers++;
 					}
+				}
+				else if(boardState.attackState == AttackState.CASH)
+				{
+					numberOfPlaceableArmies = boardState.numberOfPlaceableArmies;
+				}
+				else if(boardState.attackState == AttackState.PLACE)
+				{
+					numberOfPlaceableArmies = boardState.numberOfPlaceableArmies;
 				}
 				break;
 				
@@ -406,6 +410,14 @@ public class SimBoard
 					
 					executeInvasion(simAgents[currentPlayer].moveArmiesIn(attackerCC,defenderCC));
 					finishInvasion();
+				}
+				if(attackState == AttackState.CASH)
+				{
+					executeAttackCash();
+				}
+				if(attackState == AttackState.PLACE)
+				{
+					executeAttackPlacement();
 				}
 				simAgents[currentPlayer].attackPhase();
 				tearDownAttackPhase();
@@ -524,7 +536,7 @@ public class SimBoard
 	
 	public boolean cashCards(Card card1, Card card2, Card card3)
 	{
-		if(currentPhase != Phase.CARDS)
+		if(currentPhase != Phase.CARDS && (currentPhase != Phase.ATTACK || attackState != AttackState.CASH))
 		{
 			System.out.println("Wrong phase!");
 			return false;
@@ -595,7 +607,8 @@ public class SimBoard
 	public void placeArmies(int numberOfArmies, int cc)
 	{
 		Country country = countries[cc];
-		if(currentPhase != Phase.PLACEMENT && currentPhase != Phase.INITIAL_PLACEMENT)
+		if(currentPhase != Phase.PLACEMENT && currentPhase != Phase.INITIAL_PLACEMENT 
+				&& (currentPhase != Phase.ATTACK || attackState != AttackState.PLACE))
 		{
 			throw new IllegalArgumentException("Player " + realAgentNames[currentPlayer] + 
 												" (" + currentPlayer + ") cannot place during " +
@@ -666,6 +679,22 @@ public class SimBoard
 			setupInvasion();
 			executeInvasion(simAgents[currentPlayer].moveArmiesIn(attackingCC,defendingCC));
 			finishInvasion();
+			
+			if(attackState == AttackState.CASH)
+			{
+				numberOfPlaceableArmies = 0;
+				List<Card> cardsList = playerCards.get(currentPlayer);
+				Card [] cards = cardsList.toArray(new Card[cardsList.size()]);
+				
+				simAgents[currentPlayer].cardsPhase(cards);
+				simAgents[currentPlayer].placeArmies(numberOfPlaceableArmies);
+				
+				if(numberOfPlaceableArmies > 0)
+				{
+					System.out.println("Error! Agent " + simAgents[currentPlayer].name() + " did not place all their armies");
+				}
+			}
+			
 			return DEFENDERS_DESTROYED;
 		}
 		
@@ -738,16 +767,16 @@ public class SimBoard
 	
 	protected void finishInvasion()
 	{
+		hasInvadedACountry = true;
+		attackState = AttackState.START;
+		
 		if(playerCountries[defendingPlayer] == 0)
 		{
 			playerDefeated(defendingPlayer,attackingPlayer);
 		}
-		
-		hasInvadedACountry = true;
-		attackState = AttackState.START;
 	}
 	
-	private void playerDefeated(int player, int conquerer)
+	protected void playerDefeated(int player, int conquerer)
 	{
 		remainingPlayers--;
 		playerOutOnTurn[player] = simTurnCount;
@@ -756,16 +785,14 @@ public class SimBoard
 		if(transferCards)
 		{
 			playerCards.get(conquerer).addAll(playerCards.get(player));
+			if(immediateCash && playerCards.get(conquerer).size() >= 5)
+			{
+				//attackState = AttackState.CASH;
+			}
 		}
 		else
 		{
 			cardManager.simReturnToDeck(playerCards.get(player), coreID);
-		}
-		
-		if(immediateCash)
-		{
-			throw new IllegalArgumentException("IMMEDIATE CASH NOT IMPLEMENTED!");
-			//TODO implement immediate cache
 		}
 		
 		if(remainingPlayers == 1)
@@ -775,9 +802,24 @@ public class SimBoard
 		}
 	}
 	
+	protected void executeAttackCash()
+	{
+		numberOfPlaceableArmies = 0;
+		List<Card> cardsList = playerCards.get(currentPlayer);
+		simAgents[currentPlayer].cardsPhase(cardsList.toArray(new Card[cardsList.size()]));
+		
+		attackState = AttackState.PLACE;
+	}
+
+	protected void executeAttackPlacement()
+	{
+		simAgents[currentPlayer].placeArmies(numberOfPlaceableArmies);
+		attackState = AttackState.START;
+	}
+	
 	protected void tearDownAttackPhase()
 	{
-		if(hasInvadedACountry)
+		if(hasInvadedACountry && useCards)
 		{
 			Card card = cardManager.simDeal(coreID);
 			if(card != null)

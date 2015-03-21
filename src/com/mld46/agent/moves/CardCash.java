@@ -9,9 +9,9 @@ public class CardCash extends Move
 	public final Card card2;
 	public final Card card3;
 	
-	public CardCash(Card card1, Card card2, Card card3)
+	public CardCash(Card card1, Card card2, Card card3, Phase phase)
 	{
-		super(Phase.CARDS);
+		super(phase);
 		this.card1 = card1;
 		this.card2 = card2;
 		this.card3 = card3;

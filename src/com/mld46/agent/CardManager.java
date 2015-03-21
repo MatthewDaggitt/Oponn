@@ -9,30 +9,47 @@ import com.sillysoft.lux.Country;
 
 public class CardManager
 {
-	private final static Card wildcard = new Card(-1,3);
+	// Static variables
 	
+	private final static Card wildcard = new Card(-1,3);
+	private final int numberOfPlayers;
+	private final int agentID;
+	
+	// Real variables
+	
+	public final String cardProgression;
+	public final boolean transferCards;
+	public final boolean immediateCash;
+	
+	private int [] previousCardNumbers;
 	private final Card [] deck;
+	
+	private int cardProgressionPos = 0;
 	
 	private final List<Card> notInHand = new ArrayList<Card>();
 	private final List<Card> inHand = new ArrayList<Card>();
 
-	private List<List<Card>> simDecks;
-	private Random random;
-	private boolean canRunOutOfCards;
+	// Simulation variables
 	
-	public final String cardProgression;
-	private int cardProgressionPos = 0;
+	private Random random;
+	private List<List<Card>> simDecks;
+	private boolean canRunOutOfCards;
 	private int [] simCardProgressionPositions;
 	
 	////////////////////////
 	// Real state methods //
 	////////////////////////
 	
-	public CardManager(Country [] allCountries, int numberOfPlayers, int cores, String cardProgression)
+	public CardManager(Country [] allCountries, int numberOfPlayers, int agentID, int cores, String cardProgression, boolean transferCards, boolean immediateCash)
 	{
 		this.cardProgression = cardProgression;
+		this.numberOfPlayers = numberOfPlayers;
+		this.agentID = agentID;
+		this.transferCards = transferCards;
+		this.immediateCash = immediateCash;
 		
 		deck = new Card[allCountries.length];
+		previousCardNumbers = new int[numberOfPlayers];
 		
 		int counter = 0;
 		for(Country c : allCountries)
@@ -57,12 +74,6 @@ public class CardManager
 		
 	}
 	
-	public void resetForNewGame()
-	{
-		notInHand.addAll(inHand);
-		inHand.clear();
-	}
-			
 	public void updateCardsHeld(Card [] realCards)
 	{
 		for(Card realCard : realCards)
@@ -96,6 +107,94 @@ public class CardManager
 			inHand.add(wildcard);
 			notInHand.remove(wildcard);
 		}
+	}
+	
+	public void updateCardProgressionPosition(int nextValue, int [] newCardNumbers, boolean [] playersEliminatedLastTurn)
+	{
+		if(cardProgression.equals("0"))
+		{
+			cardProgressionPos = 1;
+		}
+		else if(cardProgression.equals("4, 5, 6..."))
+		{
+			cardProgressionPos = nextValue-3;
+		}
+		else if(cardProgression.equals("4, 6, 8..."))
+		{
+			cardProgressionPos = nextValue/2 - 1;
+		}
+		else if(cardProgression.equals("3, 6, 9..."))
+		{
+			cardProgressionPos = nextValue/3;
+		}
+		else if(cardProgression.equals("4, 6, 8, 10, 15, 20..."))
+		{
+			cardProgressionPos = nextValue <= 10 ? nextValue/2 - 1 : nextValue/5 + 2;
+		}
+		else if(cardProgression.equals("5, 10, 15..."))
+		{
+			cardProgressionPos = nextValue/5;
+		}
+		else if(cardProgression.equals("4, 6, 8, 10, 15, 20, 25, 10, 10, 10..."))
+		{
+			if(nextValue < 10)
+			{
+				cardProgressionPos = nextValue/2 - 1;
+			}
+			else if(nextValue > 10)
+			{
+				cardProgressionPos = nextValue/5 + 2;
+			}
+			else
+			{
+				cardProgressionPos = cardProgressionPos <= 4 ? 4 : 8;
+			}
+		}
+		else
+		{
+			int estimatedCardsCashed = 0;
+			int floatingTransferCards = 0;
+			for(int i = 0; i < numberOfPlayers; i++)
+			{
+				if(i != agentID)
+				{
+					if(playersEliminatedLastTurn[i])
+					{
+						if(transferCards)
+						{
+							floatingTransferCards += previousCardNumbers[i];
+						}
+					}
+					else
+					{
+						if(newCardNumbers[i] > previousCardNumbers[i] + 1)
+						{
+							floatingTransferCards -= newCardNumbers[i] - previousCardNumbers[i] - 1;
+						}
+						else if(newCardNumbers[i] < previousCardNumbers[i])
+						{
+							estimatedCardsCashed += previousCardNumbers[i] - newCardNumbers[i] - 1;
+						}
+					}
+				}
+			}
+			int estimatedCashes = (estimatedCardsCashed + floatingTransferCards)/3;
+			
+			if(cardProgression.equals("5, 5, 5..."))
+			{
+				cardProgressionPos += estimatedCashes;
+			}
+			else if(cardProgression.equals("4, 4, 6, 6, 6, 8, 8, 8, 8, 10..."))
+			{
+				int tri = (nextValue-2)/2;
+				cardProgressionPos = Math.max(cardProgressionPos,tri*(tri+1)/2) + estimatedCashes;
+			}
+			else
+			{
+				throw new IllegalArgumentException("Unrecognised card progression: " + cardProgression);
+			}
+		}
+		previousCardNumbers = newCardNumbers;
 	}
 	
 	public List<Card> getCardsHeld()
@@ -172,6 +271,8 @@ public class CardManager
 	{
 		switch(cardProgression)
 		{
+			case "0":
+				return 0;
 			case "5, 5, 5...": 
 				return 5;
 			case "4, 4, 6, 6, 6, 8, 8, 8, 8, 10...":
@@ -193,7 +294,7 @@ public class CardManager
 				throw new IllegalArgumentException();
 		}
 	}
-
+	
 	public void simReturnToDeck(List<Card> cards, int coreID)
 	{
 		simDecks.get(coreID).addAll(cards);

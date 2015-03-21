@@ -67,10 +67,13 @@ public class MCSTTree
 		return move;
 	}
 	
-	public Move getCardMove(BoardState boardState)
+	public Move getCardMove(BoardState boardState, boolean cardPhase)
 	{
-		// Clear the root as we're at the start of a new turn
-		root = null;
+		if(cardPhase)
+		{
+			// Clear the root as we're at the start of a new turn
+			root = null;
+		}
 		Move move = calculateMove(boardState);
 		updateRoot(move);
 		return move;
@@ -85,7 +88,7 @@ public class MCSTTree
 	
 	public Move getAttackMove(BoardState boardState, AttackOutcome attackOutcome)
 	{
-		// Then there was not an invasion last turn, and the AttackOutcome at the root fo tree must be removed
+		// Then there was not an invasion last turn, and the AttackOutcome at the root of tree must be removed
 		if(attackOutcome != null)
 		{
 			updateRoot(attackOutcome);
@@ -266,13 +269,29 @@ public class MCSTTree
 		{
 			DecimalFormat df = new DecimalFormat("#.##");
 			Debug.output("Selecting move from:",2);
+			
 			for(int i = 0; i < root.children.size(); i++)
 			{
-				Debug.output("Move " + i + " " + (root.children.get(i).restored ? "*" : "") + 
-						"(" + Arrays.toString(root.children.get(i).wins) + ")," +
-						" WL=" + df.format(root.children.get(i).averageWinLength[agentID]) + 
-						" LL=" + df.format(root.children.get(i).averageLossLength[agentID]) + 
-						" : " + root.children.get(i).move.toString(),3);
+				SearchNode node = root.children.get(i);
+				int sum = 0;
+				for(int v : node.wins)
+				{
+					sum += v;
+				}
+				
+				String winString = "[";
+				for(int j = 0; j < node.wins.length; j++)
+				{
+					winString += (j == 0 ? "" : ", ") + String.format("%.3f", node.wins[j]/(double)sum);
+				}
+				winString += "]";
+				
+				Debug.output("Move " + i + " " + (node.restored ? "*" : "") + 
+						"(" + winString + "," +
+						" G=" + sum + 
+						" WL=" + df.format(node.averageWinLength[agentID]) + 
+						" LL=" + df.format(node.averageLossLength[agentID]) + 
+						" : " + root.children.get(i).move.toString() + ")",3);
 			}
 			Debug.output("Selected: " + bestMove.toString(),2);
 			Debug.output("Current (" + Arrays.toString(root.wins) + ")," +

@@ -7,9 +7,9 @@ public class Placement extends Move implements Comparable<Placement>
 	public final int cc;
 	public final int armies;
 	
-	public Placement(int cc, int armies)
+	public Placement(int cc, int armies, Phase phase)
 	{
-		super(Phase.PLACEMENT);
+		super(phase);
 		
 		this.cc = cc;
 		this.armies = armies;

@@ -95,6 +95,7 @@ public class ExploratorySimBoard extends SimBoard
 				}
 				initiatedWithInvasion = boardState.attackState == AttackState.INVADE;
 				
+				minPlacementCC = 0;
 				minAttackSourceCC = 0;
 				minAttackDestinationCC = 0;
 				break;
@@ -295,9 +296,9 @@ public class ExploratorySimBoard extends SimBoard
 			case INITIAL_PLACEMENT:
 				return getInitialPlacementMoves();
 			case CARDS:
-				return getCardMoves();
+				return getCardMoves(Phase.CARDS);
 			case PLACEMENT:
-				return getPlacementMoves();
+				return getPlacementMoves(Phase.PLACEMENT);
 			case ATTACK:
 				return getAttackMoves();
 			case FORTIFICATION:
@@ -307,30 +308,26 @@ public class ExploratorySimBoard extends SimBoard
 		}
 	}
 	
-	private List<Move> getCardMoves()
+	private List<Move> getCardMoves(Phase phase)
 	{
 		Card [] cards = new Card[playerCards.get(currentPlayer).size()];
 		cards = playerCards.get(currentPlayer).toArray(cards);
 		
 		List<Move> moves = new ArrayList<Move>();
 		
-		if(cards.length < 3)
+		if(cards.length >= 3)
 		{
-			moves.add(new NextPhase(Phase.PLACEMENT, Phase.CARDS, currentPlayer));
-		}
-		else
-		{
-			//TODO Think about some more!
+			//TODO Need to change!
 			Card [] bestSet = Card.getBestSet(cards,currentPlayer,countries);
 			if(bestSet != null)
 			{
-				moves.add(new CardCash(bestSet[0],bestSet[1],bestSet[2]));
+				moves.add(new CardCash(bestSet[0], bestSet[1], bestSet[2], phase));
 			}
-			
-			if(cards.length < 5)
-			{
-				moves.add(new NextPhase(Phase.PLACEMENT, Phase.CARDS, currentPlayer));
-			}
+		}
+		
+		if(cards.length < 5)
+		{
+			moves.add(new NextPhase(Phase.PLACEMENT, Phase.CARDS, currentPlayer));
 		}
 		return moves;
 	}
@@ -398,7 +395,7 @@ public class ExploratorySimBoard extends SimBoard
 		return moves;
 	}
 	
-	private List<Move> getPlacementMoves()
+	private List<Move> getPlacementMoves(Phase phase)
 	{
 		List<Move> moves = new ArrayList<Move>();
 		
@@ -431,11 +428,11 @@ public class ExploratorySimBoard extends SimBoard
 					cc = possiblePlacements.get(i).getCode();
 					for(int j = 1; j <= numberOfPlaceableArmies; j++)
 					{
-						moves.add(new Placement(cc,j));
+						moves.add(new Placement(cc,j,phase));
 					}
 				}
 				
-				moves.add(new Placement(possiblePlacements.get(numberOfPlacements-1).getCode(),numberOfPlaceableArmies));
+				moves.add(new Placement(possiblePlacements.get(numberOfPlacements-1).getCode(), numberOfPlaceableArmies, phase));
 			}
 			else
 			{
@@ -443,7 +440,7 @@ public class ExploratorySimBoard extends SimBoard
 				{
 					for(int j = 1; j <= numberOfPlaceableArmies; j++)
 					{
-						moves.add(new Placement(targetCountry.getCode(),j));
+						moves.add(new Placement(targetCountry.getCode(), j, phase));
 					}
 				}
 			}
@@ -594,9 +591,13 @@ public class ExploratorySimBoard extends SimBoard
 				}
 			}
 		}
-		else
+		else if(attackState == AttackState.CASH)
 		{
-			throw new IllegalStateException("Invalid attack stage");
+			return getCardMoves(Phase.ATTACK);
+		}
+		else if(attackState == AttackState.PLACE) 
+		{
+			return getPlacementMoves(Phase.ATTACK);
 		}
 		
 		return moves;
@@ -835,5 +836,14 @@ public class ExploratorySimBoard extends SimBoard
 				Arrays.fill(row, false);
 			}
 		}
+	}
+
+	@Override
+	protected void executeAttackPlacement()
+	{
+		minAttackSourceCC = 0;
+		minAttackDestinationCC = 0;
+		minPlacementCC = 0;
+		super.executeAttackPlacement();
 	}
 }

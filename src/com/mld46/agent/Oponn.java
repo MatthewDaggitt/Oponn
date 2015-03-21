@@ -63,8 +63,7 @@ public class Oponn extends SimAgent
 	private MCSTTree tree;
 	
 	private Attack lastAttack = null;
-	private int [] opponentCardNumbers;
-	
+	private boolean [] playersEliminated;
 	
 	public void setPrefs(int newID, Board board)
 	{
@@ -112,21 +111,17 @@ public class Oponn extends SimAgent
 	
 	private void setup()
 	{
-		if(!boardState.useCards)
-		{
-			throw new IllegalArgumentException("MCST agent must use cards!");
-		}
+		cardManager = new CardManager(countries, numberOfPlayers, ID, CORES, cardProgression, boardState.transferCards, boardState.immediateCash);
 		
-		cardManager = new CardManager(countries, numberOfPlayers, CORES, cardProgression);
 		SimAgent [] simAgents = createSimAgents();
-		
-		opponentCardNumbers = new int[numberOfPlayers];
 		
 		ExploratorySimBoard [] simBoards = new ExploratorySimBoard[CORES];
 		for(int i = 0; i < CORES; i++)
 		{
 			simBoards[i] = new ModellingSimBoard(countries, boardState, simAgents, cardManager, i, MODELLING_TURN_LIMIT);
 		}
+		
+		playersEliminated = new boolean [numberOfPlayers];
 		
 		tree = new MCSTTree(
 			simBoards,
@@ -203,43 +198,49 @@ public class Oponn extends SimAgent
 
 	public void cardsPhase(Card [] cards)
 	{
-		Debug.output("",0);
-		Debug.output("starting turn " + getTurnCount(),0);
-		
-		Debug.output("",0);
-		Debug.output("entering cards phase",1);
-		
 		cardManager.updateCardsHeld(cards);
+		boolean cardPhase = lastAttack == null;
 		
-		System.out.println("");
-		System.out.println("Turn: " + getTurnCount());
-		for(int i = 0; i < numberOfPlayers; i++)
+		if(cardPhase)
 		{
-			if(i != ID)
+			// Normal card phase
+			
+			Debug.output("",0);
+			Debug.output("starting turn " + getTurnCount(),0);
+			
+			Debug.output("",0);
+			Debug.output("entering cards phase",1);
+			
+			int [] cardNumbers = new int[numberOfPlayers];
+			boolean [] playersEliminatedLastTurn = new boolean[numberOfPlayers];
+			for(int i = 0; i < numberOfPlayers; i++)
 			{
-				int newCards = getPlayerCards(i);
-				int oldCards = opponentCardNumbers[i];
-				
-				System.out.println("Player " + i + " has " + newCards + "-" + oldCards + " cards");
-				
-				if(newCards < oldCards)
+				cardNumbers[i] = getPlayerCards(i);
+				if((getPlayerIncome(i) == 0) != playersEliminated[i])
 				{
-					cardManager.incrementCardProgressionPosition();
+					playersEliminatedLastTurn[i] = true;
+					playersEliminated[i] = true;
 				}
-				
-				opponentCardNumbers[i] = newCards;
 			}
+			cardManager.updateCardProgressionPosition(getNextCardSetValue(), cardNumbers, playersEliminatedLastTurn);
+			
+			boardState.currentPhase = Phase.CARDS;
+			boardState.turnCount = getTurnCount();
 		}
+		else
+		{
+			// We've come here after stealing cards from an eliminated player
+			boardState.currentPhase = Phase.ATTACK;
+			boardState.attackState = AttackState.CASH;
+		}
+		
 		boardState.numberOfPlaceableArmies = 0;
-		boardState.turnCount = getTurnCount();
-		boardState.currentPhase = Phase.CARDS;
 		for(int i = 0; i < numberOfPlayers; i++)
 		{
 			boardState.playerNumberOfCards[i] = getPlayerCards(i);
 		}
 		
-		Move move = tree.getCardMove(boardState);
-			
+		Move move = tree.getCardMove(boardState, cardPhase);
 		while(move instanceof CardCash)
 		{
 			CardCash cc = (CardCash) move;
@@ -260,8 +261,8 @@ public class Oponn extends SimAgent
 			cardManager.cashCards(cc.card1,cc.card2,cc.card3);
 			boardState.playerNumberOfCards[ID] -= 3;
 			boardState.numberOfPlaceableArmies += getNextCardSetValue();
-
-			move = tree.getCardMove(boardState);
+			
+			move = tree.getCardMove(boardState, false);
 		}
 		
 		Debug.output("exiting cards phase",1);
@@ -269,10 +270,20 @@ public class Oponn extends SimAgent
 
 	public void placeArmies(int numberOfArmies)
 	{
-		Debug.output("",0);
-		Debug.output("entering placing phase",1);
+		if(lastAttack == null)
+		{
+			Debug.output("",0);
+			Debug.output("entering placing phase",1);
+			
+			boardState.currentPhase = Phase.PLACEMENT;
+		}
+		else
+		{
+			// We've come here after stealing cards from an eliminated player
+			boardState.currentPhase = Phase.ATTACK;
+			boardState.attackState = AttackState.PLACE;
+		}
 		
-		boardState.currentPhase = Phase.PLACEMENT;
 		boardState.numberOfPlaceableArmies = numberOfArmies;
 		
 		Move move = tree.getPlacementMove(boardState);
@@ -324,10 +335,17 @@ public class Oponn extends SimAgent
 				outcome = null;
 			}
 			
+			if(result == SimBoard.DEFENDERS_DESTROYED && getPlayerIncome(boardState.defendingPlayer) == 0)
+			{
+				playersEliminated[boardState.defendingPlayer] = true;
+			}
+			
+			lastAttack = null;
 			boardState.attackState = AttackState.START;
-
 			move = tree.getAttackMove(boardState, outcome);
 		}
+		
+		
 		
 		Debug.output("exiting attack phase",1);
 	}
@@ -370,8 +388,9 @@ public class Oponn extends SimAgent
 
 	public String youWon()
 	{ 
-		cardManager.resetForNewGame();
 		System.out.println("Game over - won!");
+		
+		setup();
 		
 		// For variety we store a bunch of answers and pick one at random to return.
 		String[] answers = new String[] {"Random!"};

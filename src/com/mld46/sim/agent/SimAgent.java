@@ -183,7 +183,7 @@ public abstract class SimAgent implements LuxAgent
 	{
 		return simulating ? simBoard.getTurnCount() : board.getTurnCount();
 	}
-	
+		
 	protected void setBackerPrefs(SimAgent simAgent)
 	{
 		if(simulating)
