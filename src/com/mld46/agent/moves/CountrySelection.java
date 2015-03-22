@@ -2,12 +2,12 @@ package com.mld46.agent.moves;
 
 import com.mld46.sim.board.SimBoard.Phase;
 
-public class SelectCountry extends Move
+public class CountrySelection extends Move
 {
 	public final int cc;
 	private final String name;
 	
-	public SelectCountry(int cc)
+	public CountrySelection(int cc)
 	{
 		super(Phase.COUNTRY_SELECTION);
 		this.cc = cc;
@@ -17,9 +17,9 @@ public class SelectCountry extends Move
 	@Override
 	public boolean equals(Object o)
 	{
-		if(o instanceof SelectCountry)
+		if(o instanceof CountrySelection)
 		{
-			SelectCountry sc = (SelectCountry)o; 
+			CountrySelection sc = (CountrySelection)o; 
 			return sc.cc == cc;
 		}
 		return false;

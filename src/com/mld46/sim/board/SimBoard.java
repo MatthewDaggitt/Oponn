@@ -77,6 +77,9 @@ public class SimBoard
 	private final int [] playerOutOnTurn;
 	private final int [] playerPositions;
 	
+	// Country selection phase
+	protected int remainingCountries;
+	
 	// Initial placement phase
 	protected int initialPlacementRound;
 	protected int [] initialArmiesLeftToPlace;
@@ -136,7 +139,6 @@ public class SimBoard
 		{
 			initialArmiesLeftToPlace[i] = startingArmies;
 		}
-		
 		
 		this.originalCountries = originalCountries;
 		countries = new Country[numberOfCountries];
@@ -204,6 +206,7 @@ public class SimBoard
 	{
 		simStartTurn = boardState.turnCount;
 		currentPlayer = boardState.currentPlayer;
+		currentPhase = boardState.currentPhase;
 		
 		setupCountries();
 		setupCardState(boardState.playerNumberOfCards);
@@ -219,9 +222,8 @@ public class SimBoard
 		{
 			Country country = countries[cc];
 			Country originalCountry = originalCountries[cc];
-			
-			int owner = originalCountry.getOwner();
-			country.setOwner(owner,null);
+
+			country.setOwner(originalCountry.getOwner(),null);
 			country.setArmies(originalCountry.getArmies(),null);
 		}
 	}
@@ -269,8 +271,6 @@ public class SimBoard
 			int owner = country.getOwner();
 			int continent = country.getContinent();
 			
-			playerCountries[owner]++;
-			
 			for(int player = 0; player < numberOfPlayers; player++)
 			{
 				if(player != owner)
@@ -278,25 +278,49 @@ public class SimBoard
 					countriesPlayerMissingInContinent[player][continent]++;
 				}
 			}
+			
+			if(!(currentPhase == Phase.COUNTRY_SELECTION && owner == -1))
+			{
+				playerCountries[owner]++;
+			}
 		}
 		
-		for(int player = 0; player < numberOfPlayers; player++)
+		if(currentPhase == Phase.COUNTRY_SELECTION)
 		{
-			if(playerCountries[player] > 0)
+			remainingPlayers = numberOfPlayers;
+		}
+		else
+		{
+			for(int player = 0; player < numberOfPlayers; player++)
 			{
-				remainingPlayers++;
+				if(playerCountries[player] > 0)
+				{
+					remainingPlayers++;
+				}
 			}
 		}
 	}
 	
 	protected void setupPhaseGameState(BoardState boardState)
 	{
-		currentPhase = boardState.currentPhase;
-		
 		switch(currentPhase) 
 		{
 			case COUNTRY_SELECTION:
-				throw new IllegalArgumentException("COUNTRY SELECTION TO DO!");
+				Arrays.fill(initialArmiesLeftToPlace, calculateStartingArmies());
+				remainingCountries = 0;
+				for(int cc = 0; cc < numberOfCountries; cc++)
+				{
+					int owner = countries[cc].getOwner();
+					if(owner == -1)
+					{
+						remainingCountries++;
+					}
+					else
+					{
+						initialArmiesLeftToPlace[owner]--;
+					}
+				}
+				break;
 				
 			case INITIAL_PLACEMENT:
 				initialPlacementRound = boardState.initialPlacementRound;
@@ -375,6 +399,10 @@ public class SimBoard
 		// Catch up to the start of the next phase
 		switch(currentPhase)
 		{	
+			case COUNTRY_SELECTION:
+				tearDownCountrySelectionPhase();
+				break;
+				
 			case INITIAL_PLACEMENT:
 				if(numberOfPlaceableArmies > 0)
 				{
@@ -428,7 +456,7 @@ public class SimBoard
 				tearDownFortificationPhase();
 				break;
 				
-			default:
+			case NEXT_PHASE:
 				throw new IllegalArgumentException("Cannot be in the NEXT_PHASE phase during simulation");
 		}
 		
@@ -438,6 +466,11 @@ public class SimBoard
 		{
 			switch(currentPhase)
 			{
+				case COUNTRY_SELECTION:
+					selectCountry(simAgents[currentPlayer].pickCountry());
+					tearDownCountrySelectionPhase();
+					break;
+					
 				case INITIAL_PLACEMENT:
 					setupInitialPlacementPhase();
 					simAgents[currentPlayer].placeInitialArmies(numberOfPlaceableArmies);
@@ -470,16 +503,49 @@ public class SimBoard
 					tearDownFortificationPhase();
 					break;
 				
-				default:
-					throw new IllegalArgumentException("Cannot be in phase " + currentPhase + " whilst simulating");
+				case NEXT_PHASE:
+					throw new IllegalArgumentException("Cannot be in phase NEXT_PHASE whilst simulating");
 			}
 		}
 		return playerOutOnTurn;
 	}
 	
+	/** Country selection phase **/
+	
+	protected void selectCountry(int cc)
+	{
+		if(cc < 0)
+		{
+			System.out.println("Err...");
+		}
+		
+		if(countries[cc].getOwner() != -1)
+		{
+			throw new IllegalArgumentException("Cannot pick " + countries[cc].getName() + " as it is already owned!");
+		}
+		
+		countries[cc].setOwner(currentPlayer, null);
+		
+		playerCountries[currentPlayer]++;
+		initialArmiesLeftToPlace[currentPlayer]--;
+		remainingCountries--;
+		countriesPlayerMissingInContinent[currentPlayer][countries[cc].getContinent()]--;
+		
+		currentPlayer = (currentPlayer + 1) % numberOfPlayers;
+	}
+	
+	protected void tearDownCountrySelectionPhase()
+	{
+		if(remainingCountries == 0)
+		{
+			currentPhase = Phase.INITIAL_PLACEMENT;
+			currentPlayer = 0;
+		}
+	}
+	
 	/** Initial placement phase **/
 	
-	private int calculateStartingArmies()
+	protected int calculateStartingArmies()
 	{
 	    double f1 = numberOfCountries/42.0;
 	    f1 -= 1.0;
@@ -908,6 +974,42 @@ public class SimBoard
 		}
 		currentPlayer = nextPlayer;
 		currentPhase = Phase.CARDS;
+		
+		checkForOverflow();
+	}
+	
+	protected void checkForOverflow()
+	{
+		int [] armyTotals = new int[numberOfPlayers];
+		for(Country c : countries)
+		{
+			armyTotals[c.getOwner()] += c.getArmies();
+		}
+		
+		int totalArmies = 0;
+		int maxArmies = 0;
+		int maxPlayer = -1;
+		for(int i = 0; i < numberOfPlayers; i++)
+		{
+			totalArmies += armyTotals[i];
+			if(armyTotals[i] > maxArmies)
+			{
+				maxPlayer = i;
+				maxArmies = armyTotals[i];
+			}
+		}
+		
+		if(totalArmies > 100000)
+		{
+			for(int i = 0; i < numberOfPlayers; i++)
+			{
+				if(playerCountries[i] > 0 && i != maxPlayer)
+				{
+					playerDefeated(i, maxPlayer);
+				}
+			}
+			System.out.println("Overflow!");
+		}
 	}
 	
 	/*************************/

@@ -8,6 +8,7 @@ import java.util.List;
 import com.mld46.agent.Oponn.MoveSelectionPolicy;
 import com.mld46.agent.moves.Attack;
 import com.mld46.agent.moves.AttackOutcome;
+import com.mld46.agent.moves.CountrySelection;
 import com.mld46.agent.moves.Move;
 import com.mld46.agent.moves.NextPhase;
 import com.mld46.sim.board.ExploratorySimBoard;
@@ -49,21 +50,21 @@ public class MCSTTree
 		this.simBoards = simBoards;
 	}
 	
-	public Move getCountrySelectionMove(BoardState boardState)
+	public Move getCountrySelectionMove(BoardState boardState, int [] previousSelections)
 	{
+		updateCountrySelectionRoot(previousSelections);
 		Move move = calculateMove(boardState);
 		// Clear the root as other players will now play moves
-		root = null;
 		return move;
 	}
 	
 	public Move getInitialPlacementMove(BoardState boardState)
 	{
-		Move move = calculateMove(boardState);
 		// Clear root as we may be ending our initial placement turn.
 		// Not much point in retaining it, even if we're not as there
 		// will be loads of places to go initially.
 		root = null;
+		Move move = calculateMove(boardState);
 		return move;
 	}
 	
@@ -131,6 +132,35 @@ public class MCSTTree
 		}
 		
 		throw new IllegalStateException("The following move cannot be found amongst <root>'s children: " + movePlayed.toString());
+	}
+	
+	private void updateCountrySelectionRoot(int [] previousSelections)
+	{
+		if(!retainRoot || root == null)
+		{
+			root = null;
+			return;
+		}
+		
+		for(int i = 0; i < numberOfPlayers; i++)
+		{
+			boolean found = false;
+			
+			for(SearchNode child : root.children)
+			{
+				if(((CountrySelection)child.move).cc == previousSelections[i])
+				{
+					root = child;
+					found = true;
+				}
+			}
+			
+			if(!found)
+			{
+				root = null;
+				return;
+			}
+		}
 	}
 	
 	private Move calculateMove(BoardState boardState)

@@ -3,11 +3,13 @@ package com.mld46.agent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.util.Arrays;
 import java.util.Random;
 
 import com.mld46.agent.moves.Attack;
 import com.mld46.agent.moves.AttackOutcome;
 import com.mld46.agent.moves.CardCash;
+import com.mld46.agent.moves.CountrySelection;
 import com.mld46.agent.moves.Fortification;
 import com.mld46.agent.moves.InitialPlacement;
 import com.mld46.agent.moves.Invasion;
@@ -26,7 +28,9 @@ import com.sillysoft.lux.Card;
 
 public class Oponn extends SimAgent
 {
-	// Settings
+	/**************/
+	/** Settings **/
+	/**************/
 	
 	public enum MoveSelectionPolicy
 	{
@@ -56,7 +60,9 @@ public class Oponn extends SimAgent
 	private int ITERATIONS;
 	private int CORES;
 	
-	// State
+	/***********/
+	/** State **/
+	/***********/
 	
 	private BoardState boardState;
 	private CardManager cardManager;
@@ -64,6 +70,11 @@ public class Oponn extends SimAgent
 	
 	private Attack lastAttack = null;
 	private boolean [] playersEliminated;
+	private int [] countryOwners;
+	
+	/********************/
+	/** Initialisation **/
+	/********************/
 	
 	public void setPrefs(int newID, Board board)
 	{
@@ -122,6 +133,8 @@ public class Oponn extends SimAgent
 		}
 		
 		playersEliminated = new boolean [numberOfPlayers];
+		countryOwners = new int[numberOfCountries];
+		Arrays.fill(countryOwners, -1);
 		
 		tree = new MCSTTree(
 			simBoards,
@@ -153,6 +166,10 @@ public class Oponn extends SimAgent
 		return simAgents;
 	}
 	
+	/*********************/
+	/** Playing methods **/
+	/*********************/
+	
 	public int pickCountry()
 	{
 		Debug.output("",0);
@@ -165,8 +182,24 @@ public class Oponn extends SimAgent
 			boardState.playerNumberOfCards[i] = 0;
 		}
 		
+		int [] selections;
+		if(RETAIN_ROOT)
+		{
+			selections = new int[numberOfPlayers];
+			for(int cc = 0; cc < numberOfCountries; cc++)
+			{
+				int owner = countries[cc].getOwner();
+				if(owner != countryOwners[cc])
+				{
+					selections[owner] = cc;
+					countryOwners[cc] = owner;
+				}
+			}
+		}
+		CountrySelection move = (CountrySelection) tree.getCountrySelectionMove(boardState, selections);
+		
 		Debug.output("exiting country selection phase!",0);
-		return -1;
+		return move.cc;
 	}
 
 	public void placeInitialArmies(int numberOfArmies)
@@ -386,19 +419,6 @@ public class Oponn extends SimAgent
 		Debug.output("exiting fortification phase",1);
 	}
 
-	public String youWon()
-	{ 
-		System.out.println("Game over - won!");
-		
-		setup();
-		
-		// For variety we store a bunch of answers and pick one at random to return.
-		String[] answers = new String[] {"Random!"};
-		Random rand = new Random();
-		
-		return answers[rand.nextInt(answers.length)];
-	}
-	
 	/***********/
 	/** Other **/
 	/***********/
@@ -416,6 +436,19 @@ public class Oponn extends SimAgent
 	public String description()
 	{
 		return "An agent using the power of Monte Carlo Search Trees";
+	}
+	
+	public String youWon()
+	{ 
+		System.out.println("Game over - won!");
+		
+		setup();
+		
+		// For variety we store a bunch of answers and pick one at random to return.
+		String[] answers = new String[] {"Random!"};
+		Random rand = new Random();
+		
+		return answers[rand.nextInt(answers.length)];
 	}
 	
 	public String message(String message, Object data)

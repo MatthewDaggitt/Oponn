@@ -15,7 +15,15 @@ public class SimRandom extends SimAgent
 	@Override
 	public int pickCountry()
 	{
-		throw new IllegalStateException("SimAgent::pickCountry() not implemented");
+		List<Integer> candidates = new ArrayList<Integer>();
+		for(int cc = 0; cc < numberOfCountries; cc++)
+		{
+			if(countries[cc].getOwner() == -1)
+			{
+				candidates.add(cc);
+			}
+		}
+		return candidates.get(random.nextInt(candidates.size()));
 	}
 	
 	@Override

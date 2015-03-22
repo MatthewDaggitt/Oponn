@@ -124,48 +124,10 @@ public class ExploratorySimBoard extends SimBoard
 		{
 			throw new IllegalArgumentException("Trying to simulate move of phase " + move.phase + " in phase " + currentPhase);
 		}
-		
-		if(move instanceof NextPhase)
+		else if(move instanceof CountrySelection)
 		{
-			NextPhase np = (NextPhase) move;
-			
-			switch(np.nextPhase)
-			{
-				case INITIAL_PLACEMENT:
-					tearDownInitialPlacementPhase();
-					setupInitialPlacementPhase();
-					break;
-					
-				case CARDS:
-					if(np.previousPhase == Phase.INITIAL_PLACEMENT)
-					{
-						tearDownInitialPlacementPhase();
-					}
-					else
-					{
-						tearDownFortificationPhase();
-					}
-					setupCardsPhase();
-					break;
-				
-				case PLACEMENT:
-					tearDownCardsPhase();
-					setupPlacementPhase();
-					break;
-					
-				case ATTACK:
-					tearDownPlacementPhase();
-					setupAttackPhase();
-					break;
-				
-				case FORTIFICATION:
-					tearDownAttackPhase();
-					setupFortificationPhase();
-					break;
-					
-				default:
-					throw new IllegalArgumentException("Next phase cannot be of type " + np.nextPhase);
-			}
+			CountrySelection cs = (CountrySelection) move;
+			selectCountry(cs.cc);
 		}
 		else if(move instanceof InitialPlacement)
 		{
@@ -281,6 +243,55 @@ public class ExploratorySimBoard extends SimBoard
 				}
 			}
 		}
+		else if(move instanceof NextPhase)
+		{
+			NextPhase np = (NextPhase) move;
+			
+			switch(np.nextPhase)
+			{
+				case INITIAL_PLACEMENT:
+					if(np.previousPhase == Phase.COUNTRY_SELECTION)
+					{
+						tearDownCountrySelectionPhase();
+					}
+					else
+					{
+						tearDownInitialPlacementPhase();
+					}
+					setupInitialPlacementPhase();
+					break;
+					
+				case CARDS:
+					if(np.previousPhase == Phase.INITIAL_PLACEMENT)
+					{
+						tearDownInitialPlacementPhase();
+					}
+					else
+					{
+						tearDownFortificationPhase();
+					}
+					setupCardsPhase();
+					break;
+				
+				case PLACEMENT:
+					tearDownCardsPhase();
+					setupPlacementPhase();
+					break;
+					
+				case ATTACK:
+					tearDownPlacementPhase();
+					setupAttackPhase();
+					break;
+				
+				case FORTIFICATION:
+					tearDownAttackPhase();
+					setupFortificationPhase();
+					break;
+					
+				default:
+					throw new IllegalArgumentException("Next phase cannot be of type " + np.nextPhase);
+			}
+		}
 		
 		return remainingPlayers != 1;
 	}
@@ -293,6 +304,8 @@ public class ExploratorySimBoard extends SimBoard
 	{
 		switch(currentPhase)
 		{
+			case COUNTRY_SELECTION:
+				return getCountrySelectionMoves();
 			case INITIAL_PLACEMENT:
 				return getInitialPlacementMoves();
 			case CARDS:
@@ -306,6 +319,24 @@ public class ExploratorySimBoard extends SimBoard
 			default:
 				throw new IllegalArgumentException("Cannot provide moves for phase " + currentPhase);
 		}
+	}
+	
+	private List<Move> getCountrySelectionMoves()
+	{
+		List<Move> moves = new ArrayList<Move>();
+		for(int cc = 0; cc < numberOfCountries; cc++)
+		{
+			if(countries[cc].getOwner() == -1)
+			{
+				moves.add(new CountrySelection(cc));
+			}
+		}
+		
+		if(moves.size() == 0)
+		{
+			moves.add(new NextPhase(Phase.INITIAL_PLACEMENT, Phase.COUNTRY_SELECTION, 0));
+		}
+		return moves;
 	}
 	
 	private List<Move> getCardMoves(Phase phase)
