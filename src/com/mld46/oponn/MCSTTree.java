@@ -111,6 +111,11 @@ public class MCSTTree
 	public Move getFortificationMove(BoardState boardState)
 	{
 		Move move = calculateMove(boardState);
+		
+		if(move instanceof NextPhase)
+		{
+			//System.out.println("Remaining: " + root.children.size());
+		}
 		updateRoot(move);
 		return move;
 	}
@@ -312,7 +317,7 @@ public class MCSTTree
 				String winString = "[";
 				for(int j = 0; j < node.wins.length; j++)
 				{
-					winString += (j == 0 ? "" : ", ") + String.format("%.3f", node.wins[j]/(double)sum);
+					winString += (j == 0 ? "" : ", ") + (j == agentID ? "#" : "") + String.format("%.3f", node.wins[j]/(double)sum);
 				}
 				winString += "]";
 				

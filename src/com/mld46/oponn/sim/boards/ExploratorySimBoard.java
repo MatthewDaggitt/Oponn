@@ -22,6 +22,7 @@ public class ExploratorySimBoard extends SimBoard
 	private final boolean attackAggressiveOptimisation;
 	private final boolean attackRepeatMovesOptimisation;
 	private final boolean attackPartialOrderOptimisation;
+	private final boolean attackUntilDeadOptimisation;
 	private final boolean invasionOptimisation;
 	private final boolean fortificationContinentOptimisation;
 	private final boolean fortificationRepeatMovesOptimisation;
@@ -57,6 +58,7 @@ public class ExploratorySimBoard extends SimBoard
 		attackAggressiveOptimisation = boardState.attackAggressiveOptimisation;
 		attackRepeatMovesOptimisation = boardState.attackRepeatMovesOptimisation;
 		attackPartialOrderOptimisation = boardState.attackPartialOrderOptimisation;
+		attackUntilDeadOptimisation = boardState.attackUntilDeadOptimisation;
 		invasionOptimisation = boardState.invasionOptimisation;
 		fortificationContinentOptimisation = boardState.fortificationContinentOptimisation;
 		fortificationRepeatMovesOptimisation = boardState.fortificationRepeatMovesOptimisation;
@@ -369,11 +371,16 @@ public class ExploratorySimBoard extends SimBoard
 		
 		if(numberOfPlaceableArmies == 0)
 		{
-			int nextPlayer = getNextPlayer();
-			if(nextPlayer == 0 && initialPlacementRound == 4)
+			int nextPlayer = (currentPlayer + 1) % numberOfPlayers;
+			while(nextPlayer != currentPlayer && initialArmiesLeftToPlace[nextPlayer] == 0)
+			{
+				nextPlayer = (nextPlayer + 1) % numberOfPlayers;
+			}
+			
+			if(nextPlayer == currentPlayer)
 			{
 				// Then go to the start of the cards phase
-				moves.add(new NextPhase(Phase.CARDS, Phase.INITIAL_PLACEMENT, nextPlayer));
+				moves.add(new NextPhase(Phase.CARDS, Phase.INITIAL_PLACEMENT, 0));
 			}
 			else
 			{
@@ -483,7 +490,7 @@ public class ExploratorySimBoard extends SimBoard
 	private List<Move> getAttackMoves()
 	{
 		List<Move> moves = new ArrayList<Move>();
-		int attackingArmies, defendingArmies;
+		int attackers, defenders;
 		int attackerCC, defenderCC;
 		
 		if(attackState == AttackState.START)
@@ -494,22 +501,26 @@ public class ExploratorySimBoard extends SimBoard
 			for(attackerCC = startSourceIndex; attackerCC < numberOfCountries; attackerCC++)
 			{
 				attackingCountry = countries[attackerCC];
-				attackingArmies = (short) attackingCountry.getArmies();
+				attackers = attackingCountry.getArmies();
 				
-				if(attackingCountry.getOwner() == currentPlayer && attackingArmies > 1)
+				if(attackingCountry.getOwner() == currentPlayer && attackers > 1)
 				{
 					int startDestinationIndex = attackPartialOrderOptimisation ? minAttackDestinationCC : 0;
 					
 					for(Country defendingCountry : attackingCountry.getAdjoiningList())
 					{
 						defenderCC = defendingCountry.getCode();
-						defendingArmies = (short) defendingCountry.getArmies();
+						defenders = defendingCountry.getArmies();
 						
 						if(defendingCountry.getOwner() != currentPlayer && defenderCC >= startDestinationIndex && 
 								!(attackRepeatMovesOptimisation && attacksMade[attackerCC][defenderCC]) &&
-								!BattleSim.unfavourableForAttacker(attackingArmies-1,defendingArmies))
+								!BattleSim.unfavourableForAttacker(attackers-1,defenders))
 						{
-							moves.add(new Attack(attackerCC,defenderCC,attackingArmies,defendingArmies, false));
+							moves.add(new Attack(attackerCC,defenderCC,attackers,defenders, false));
+							if(attackUntilDeadOptimisation && attackers > 2)
+							{
+								moves.add(new Attack(attackerCC,defenderCC,attackers,defenders, true));
+							}
 						}
 					}
 				}
@@ -541,44 +552,50 @@ public class ExploratorySimBoard extends SimBoard
 		}
 		else if(attackState == AttackState.EXECUTE)
 		{
-			attackingArmies = (short) attackingCountry.getArmies();
-			defendingArmies = (short) defendingCountry.getArmies();
+			attackers = attackingCountry.getArmies();
+			defenders = defendingCountry.getArmies();
 			
-			if(attackingArmies == 2 && defendingArmies == 1)
+			if(attackUntilDeadOptimisation && attackUntilDead)
 			{
-				moves.add(new AttackOutcome(0,1,BattleSim.a1_d1_al0,true));
-				moves.add(new AttackOutcome(1,0,BattleSim.a1_d1_al1,false));
-			}
-			else if(attackingArmies == 3 && defendingArmies == 1)
-			{
-				moves.add(new AttackOutcome(0,1,BattleSim.a2_d1_al0,true));
-				moves.add(new AttackOutcome(1,0,BattleSim.a2_d1_al1,false));
-			}
-			else if(attackingArmies >= 4 && defendingArmies == 1)
-			{		
-				moves.add(new AttackOutcome(0,1,BattleSim.a3_d1_al0,true));
-				moves.add(new AttackOutcome(1,0,BattleSim.a3_d1_al1,false));
-			}
-			else if(attackingArmies == 2 && defendingArmies >= 2)
-			{
-				moves.add(new AttackOutcome(0,1,BattleSim.a1_d2_al0,false));
-				moves.add(new AttackOutcome(1,0,BattleSim.a1_d2_al1,false));
-			}
-			else if(attackingArmies == 3 && defendingArmies >= 2)
-			{
-				moves.add(new AttackOutcome(0,2,BattleSim.a2_d2_al0,defendingArmies == 2));
-				moves.add(new AttackOutcome(1,1,BattleSim.a2_d2_al1,false));
-				moves.add(new AttackOutcome(2,0,BattleSim.a2_d2_al2,false));
-			}
-			else if(attackingArmies >= 4 && defendingArmies >= 2)
-			{
-				moves.add(new AttackOutcome(0,2,BattleSim.a3_d2_al0,defendingArmies == 2));
-				moves.add(new AttackOutcome(1,1,BattleSim.a3_d2_al1,false));
-				moves.add(new AttackOutcome(2,0,BattleSim.a3_d2_al2,false));
+				for(AttackOutcome outcome : BattleSim.getAttackOutcomes(attackers-1, defenders))
+				{
+					moves.add(outcome);
+				}
 			}
 			else
 			{
-				throw new IllegalArgumentException("Unknown attack, " + attackingArmies + " attackers and " + defendingArmies + " defenders.");
+				if(attackers == 2 && defenders == 1)
+				{
+					moves.add(new AttackOutcome(0,1,BattleSim.a1_d1_al0,true));
+					moves.add(new AttackOutcome(1,0,BattleSim.a1_d1_al1,false));
+				}
+				else if(attackers == 3 && defenders == 1)
+				{
+					moves.add(new AttackOutcome(0,1,BattleSim.a2_d1_al0,true));
+					moves.add(new AttackOutcome(1,0,BattleSim.a2_d1_al1,false));
+				}
+				else if(attackers >= 4 && defenders == 1)
+				{		
+					moves.add(new AttackOutcome(0,1,BattleSim.a3_d1_al0,true));
+					moves.add(new AttackOutcome(1,0,BattleSim.a3_d1_al1,false));
+				}
+				else if(attackers == 2 && defenders >= 2)
+				{
+					moves.add(new AttackOutcome(0,1,BattleSim.a1_d2_al0,false));
+					moves.add(new AttackOutcome(1,0,BattleSim.a1_d2_al1,false));
+				}
+				else if(attackers == 3 && defenders >= 2)
+				{
+					moves.add(new AttackOutcome(0,2,BattleSim.a2_d2_al0,defenders == 2));
+					moves.add(new AttackOutcome(1,1,BattleSim.a2_d2_al1,false));
+					moves.add(new AttackOutcome(2,0,BattleSim.a2_d2_al2,false));
+				}
+				else if(attackers >= 4 && defenders >= 2)
+				{
+					moves.add(new AttackOutcome(0,2,BattleSim.a3_d2_al0,defenders == 2));
+					moves.add(new AttackOutcome(1,1,BattleSim.a3_d2_al1,false));
+					moves.add(new AttackOutcome(2,0,BattleSim.a3_d2_al2,false));
+				}
 			}
 		}
 		else if(attackState == AttackState.INVADE)
@@ -615,8 +632,8 @@ public class ExploratorySimBoard extends SimBoard
 			}
 			else
 			{
-				attackingArmies = attackingCountry.getArmies();
-				for(int i = Math.min(attackingArmies-1,3); i < attackingArmies; i++)
+				attackers = attackingCountry.getArmies();
+				for(int i = Math.min(attackers-1,3); i < attackers; i++)
 				{
 					moves.add(new Invasion(attackingCountry.getCode(),defendingCountry.getCode(),i));
 				}

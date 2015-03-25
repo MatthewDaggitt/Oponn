@@ -81,7 +81,6 @@ public class SimBoard
 	protected int remainingCountries;
 	
 	// Initial placement phase
-	protected int initialPlacementRound;
 	protected int [] initialArmiesLeftToPlace;
 	
 	// Placement phase
@@ -133,12 +132,7 @@ public class SimBoard
 		playerCountries = new int [numberOfPlayers];
 		countriesPlayerMissingInContinent = new int[numberOfPlayers][numberOfContinents];
 		
-		int startingArmies = calculateStartingArmies();
 		initialArmiesLeftToPlace = new int[numberOfPlayers];
-		for(int i = 0; i < numberOfPlayers; i++)
-		{
-			initialArmiesLeftToPlace[i] = startingArmies;
-		}
 		
 		this.originalCountries = originalCountries;
 		countries = new Country[numberOfCountries];
@@ -192,10 +186,10 @@ public class SimBoard
 		setupGeneralGameState();
 		setupCardState(new int[numberOfPlayers]);
 		
-		int startingArmies = calculateStartingArmies();
+		initialArmiesLeftToPlace = calculateStartingArmies();
 		for(int i = 0; i < numberOfPlayers; i++)
 		{
-			initialArmiesLeftToPlace[i] = startingArmies - playerCountries[i];
+			initialArmiesLeftToPlace[i] -= playerCountries[i];
 		}
 		
 		currentPhase = Phase.INITIAL_PLACEMENT;
@@ -306,7 +300,7 @@ public class SimBoard
 		switch(currentPhase) 
 		{
 			case COUNTRY_SELECTION:
-				Arrays.fill(initialArmiesLeftToPlace, calculateStartingArmies());
+				initialArmiesLeftToPlace = calculateStartingArmies();
 				remainingCountries = 0;
 				for(int cc = 0; cc < numberOfCountries; cc++)
 				{
@@ -323,17 +317,20 @@ public class SimBoard
 				break;
 				
 			case INITIAL_PLACEMENT:
-				initialPlacementRound = boardState.initialPlacementRound;
-				int startingArmies = calculateStartingArmies();
+				int [] playerArmies = new int[numberOfPlayers];
+				for(Country country : countries)
+				{
+					playerArmies[country.getOwner()] += country.getArmies();
+				}
+				
+				initialArmiesLeftToPlace = calculateStartingArmies();
 				for(int i = 0; i < numberOfPlayers; i++)
 				{
-					initialArmiesLeftToPlace[i] = Math.max(startingArmies - playerCountries[i] - 4*initialPlacementRound, 0);
+					initialArmiesLeftToPlace[i] -= playerArmies[i];
 				}
 				
 				setupInitialPlacementPhase();
 				numberOfPlaceableArmies = boardState.numberOfPlaceableArmies;
-				// TO-DO fix when find out how are initial armies are calculated
-				initialArmiesLeftToPlace[currentPlayer] = Math.min(initialArmiesLeftToPlace[currentPlayer], numberOfPlaceableArmies);
 				break;
 				
 			case CARDS: 
@@ -545,22 +542,21 @@ public class SimBoard
 	
 	/** Initial placement phase **/
 	
-	protected int calculateStartingArmies()
+	protected int [] calculateStartingArmies()
 	{
 	    double f1 = numberOfCountries/42.0;
 	    f1 -= 1.0;
 	    f1 /= 2.0;
 	    f1 += 1.0;
+	    int base = (int) Math.round(f1 * (50 - numberOfPlayers*5));
 	    
-	    switch(numberOfPlayers)
+	    int [] armies = new int[numberOfPlayers];
+	    for(int i = 0; i < numberOfPlayers; i++)
 	    {
-	    	case 2: return (int) Math.round(f1 * 40.0);
-	    	case 3: return (int) Math.round(f1 * 35.0);
-	    	case 4: return (int) Math.round(f1 * 30.0);
-	    	case 5: return (int) Math.round(f1 * 25.0);
-	    	case 6: return (int) Math.round(f1 * 20.0);
-	    	default: return -1;
+	    	armies[i] = base + (i > 1 ? i : 0);
 	    }
+	    
+	    return armies;
 	}
 	
 	protected void setupInitialPlacementPhase()
@@ -576,21 +572,26 @@ public class SimBoard
 			System.out.println("Error! Agent " + simAgents[currentPlayer].name() + " did not place all their armies");
 		}
 		
-		int nextPlayer = getNextPlayer();
-		if(nextPlayer == 0)
+		int nextPlayer = (currentPlayer + 1) % numberOfPlayers;
+		while(nextPlayer != currentPlayer && initialArmiesLeftToPlace[nextPlayer] == 0)
 		{
-			initialPlacementRound++;
-			if(initialArmiesLeftToPlace[numberOfPlayers-1] == 0)
-			{
-				currentPhase = Phase.CARDS;
-				for(int i = 0; i < numberOfPlayers; i++)
-				{
-					simAgents[i].resetClusterManager();
-				}
-				simTurnCount++;
-			}
+			nextPlayer = (nextPlayer + 1) % numberOfPlayers;
 		}
-		currentPlayer = nextPlayer;
+		
+		if(nextPlayer == currentPlayer)
+		{
+			currentPlayer = 0;
+			currentPhase = Phase.CARDS;
+			for(int i = 0; i < numberOfPlayers; i++)
+			{
+				simAgents[i].resetClusterManager();
+			}
+			simTurnCount++;
+		}
+		else
+		{
+			currentPlayer = nextPlayer;
+		}
 	}
 	
 	/** Card phase **/

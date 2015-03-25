@@ -44,16 +44,16 @@ public class BattleSim
 	};
 	
 	private final static int LIMIT = 50;
-	private static HashMap<Integer,List<AttackOutcome>> attackOutcomes;
+	private static HashMap<Integer,AttackOutcome[]> attackOutcomes;
 	static
 	{
-		attackOutcomes = new HashMap<Integer,List<AttackOutcome>>();
+		attackOutcomes = new HashMap<Integer,AttackOutcome[]>();
 		
 		for(int a = 1; a < LIMIT; a++)
 		{
 			for(int d = 1; d < LIMIT; d++)
 			{
-				addBattleToHashmap(a,d);
+				attackOutcomes.put(szudzikMapping(a, d), generateAttackOutcomes(a,d));
 			}
 		}
 	}
@@ -93,17 +93,19 @@ public class BattleSim
 		{
 			int key = szudzikMapping(remainingAttackers, remainingDefenders);
 					
-			List<AttackOutcome> possibleResults = attackOutcomes.get(key);
+			AttackOutcome [] possibleResults = attackOutcomes.get(key);
 			if(possibleResults == null)
 			{
-				addBattleToHashmap(remainingAttackers,remainingDefenders);
-				possibleResults = attackOutcomes.get(key);
+				possibleResults = generateAttackOutcomes(remainingAttackers,remainingDefenders);
+				attackOutcomes.put(szudzikMapping(remainingAttackers, remainingDefenders), possibleResults);
 			}
 			
 			double r = random.nextDouble();
+			double total = 0;
 			for(AttackOutcome ao : possibleResults)
 			{
-				if(r <= ao.probability)
+				total += ao.probability;
+				if(r <= total)
 				{
 					attackerLosses += ao.attackerLosses;
 					defenderLosses += ao.defenderLosses;
@@ -116,20 +118,39 @@ public class BattleSim
 	}
 	
 	/**
-	 * @param attackingArmies - number of attacking armies (1-3)
-	 * @param defendingArmies - number of defending armies (1-2)
+	 * @param attackers - number of attacking armies (1-3)
+	 * @param defenders - number of defending armies (1-2)
 	 * @return the number of armies that the attackers lost
 	 */
-	public static int simulateIndividualBattle(int attackingArmies, int defendingArmies)
+	public static int simulateIndividualBattle(int attackers, int defenders)
 	{
-		if(attackingArmies > 3 || defendingArmies > 2)
+		if(attackers > 3 || defenders > 2)
 		{
-			throw new IllegalArgumentException("Error: " + attackingArmies + ":" + defendingArmies);
+			throw new IllegalArgumentException("Error: " + attackers + ":" + defenders);
 		}
 		
 		double r = random.nextDouble();
-		double [] distribution = outcomes[(attackingArmies-1)*2 + (defendingArmies-1)];
+		double [] distribution = outcomes[(attackers-1)*2 + (defenders-1)];
 		return (r <= distribution[0] ? 0 : (r <= distribution[1] ? 1 : 2));
+	}
+	
+	public static AttackOutcome simulateBattleLonghand(int attackers, int defenders)
+	{
+		int attackerLosses = 0;
+		int defenderLosses = 0;
+		
+		while(attackerLosses < attackers && defenderLosses < defenders)
+		{
+			int participatingAttackers = Math.min(attackers - attackerLosses, 3);
+			int participatingDefenders = Math.min(defenders - defenderLosses, 2);
+			int attackerLoss = simulateIndividualBattle(participatingAttackers,participatingDefenders);
+			int defenderLoss = Math.min(participatingAttackers,participatingDefenders) - attackerLoss;
+			
+			attackerLosses += attackerLoss;
+			defenderLosses += defenderLoss;
+		}
+		
+		return new AttackOutcome(attackerLosses, defenderLosses, Float.NaN, false);
 	}
 	
 	public static boolean favourableForAttacker(int freeAttackers, int defenders)
@@ -140,6 +161,18 @@ public class BattleSim
 	public static boolean unfavourableForAttacker(int freeAttackers, int defenders)
 	{
 		return freeAttackers == 1 && defenders >= 2;
+	}
+	
+	public static AttackOutcome [] getAttackOutcomes(int attackers, int defenders)
+	{
+		int key = szudzikMapping(attackers, defenders);
+		AttackOutcome [] outcomes = attackOutcomes.get(key);
+		if(outcomes == null)
+		{
+			outcomes = generateAttackOutcomes(attackers,defenders);
+			attackOutcomes.put(key, outcomes);
+		}
+		return outcomes;
 	}
 	
 	/////////////////////
@@ -220,44 +253,30 @@ public class BattleSim
 		return lastRow;
 	}
 
-	private static void addBattleToHashmap(int a, int d)
+	private static AttackOutcome [] generateAttackOutcomes(int a, int d)
 	{
-		List<AttackOutcome> singularAttackOutcomes;
-		List<AttackOutcome> cumulativeAttackOutcomes;
+		List<AttackOutcome> attackOutcomes = new ArrayList<AttackOutcome>(a*d + a + d);
 		
-		float [] probabilities;
+		float [] probabilities = generateProbabilities(a,d);
 		float probability;
 		
-		probabilities = generateProbabilities(a,d);
-		
-		singularAttackOutcomes = new ArrayList<AttackOutcome>();
-		
-		for(int a2 = 0; a2 <= a; a2++)
+		for(int remA = 0; remA <= a; remA++)
 		{
-			for(int d2 = 0; d2 <= d; d2++)
+			for(int remD = 0; remD <= d; remD++)
 			{
-				probability = probabilities[a2*(d+1) + d2];
+				probability = probabilities[remA*(d+1) + remD];
 				
 				if(probability != 0.0)
 				{
-					singularAttackOutcomes.add(new AttackOutcome(a-a2,d-d2,probability,false));
+					attackOutcomes.add(new AttackOutcome(a-remA, d-remD, probability, remD == 0));
 				}
 			}
 		}
+		Collections.sort(attackOutcomes, Collections.reverseOrder());
 		
-		Collections.sort(singularAttackOutcomes);
-		
-		cumulativeAttackOutcomes = new ArrayList<AttackOutcome>(singularAttackOutcomes.size());
-		probability = 0;
-		for(AttackOutcome ao : singularAttackOutcomes)
-		{
-			probability += ao.probability;
-			cumulativeAttackOutcomes.add(new AttackOutcome(ao.attackerLosses,ao.defenderLosses,probability,false));
-		}
-		
-		attackOutcomes.put(szudzikMapping(a, d),cumulativeAttackOutcomes);
-	}	
-
+		return attackOutcomes.toArray(new AttackOutcome[attackOutcomes.size()]);
+	}
+	
 	private static int szudzikMapping(int a, int b)
 	{
 		return a >= b ? (a * a + a + b) : (a + b * b);

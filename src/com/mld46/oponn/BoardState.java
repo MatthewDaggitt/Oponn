@@ -31,6 +31,7 @@ public class BoardState
 		public final boolean attackAggressiveOptimisation;
 		public final boolean attackRepeatMovesOptimisation;
 		public final boolean attackPartialOrderOptimisation;
+		public final boolean attackUntilDeadOptimisation;
 		public final boolean invasionOptimisation;
 		public final boolean fortificationContinentOptimisation;
 		public final boolean fortificationRepeatMovesOptimisation;
@@ -46,10 +47,6 @@ public class BoardState
 		// Card state
 		
 		public int cardProgressionPos = 0;
-		
-		// Initial placement phase
-		
-		public int initialPlacementRound;
 		
 		// Placement state
 	
@@ -70,6 +67,7 @@ public class BoardState
 		boolean attackAggressiveOptimisation,
 		boolean attackRepeatMovesOptimisation,
 		boolean attackPartialOrderOptimisation,
+		boolean attackUntilDeadOptimisation,
 		boolean invasionOptimisation,
 		boolean fortificationContinentOptimisation,
 		boolean fortificationRepeatMovesOptimisation,
@@ -105,6 +103,7 @@ public class BoardState
 		this.attackAggressiveOptimisation = attackAggressiveOptimisation;
 		this.attackRepeatMovesOptimisation = attackRepeatMovesOptimisation;
 		this.attackPartialOrderOptimisation = attackPartialOrderOptimisation;
+		this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
 		this.invasionOptimisation = invasionOptimisation;
 		this.fortificationContinentOptimisation = fortificationContinentOptimisation;
 		this.fortificationRepeatMovesOptimisation = fortificationRepeatMovesOptimisation;
@@ -118,6 +117,7 @@ public class BoardState
 			boolean attackAggressiveOptimisation,
 			boolean attackRepeatMovesOptimisation,
 			boolean attackPartialOrderOptimisation,
+			boolean attackUntilDeadOptimisation,
 			boolean invasionOptimisation,
 			boolean fortificationContinentOptimisation,
 			boolean fortificationRepeatMovesOptimisation,
@@ -153,6 +153,7 @@ public class BoardState
 			this.attackAggressiveOptimisation = attackAggressiveOptimisation;
 			this.attackRepeatMovesOptimisation = attackRepeatMovesOptimisation;
 			this.attackPartialOrderOptimisation = attackPartialOrderOptimisation;
+			this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
 			this.invasionOptimisation = invasionOptimisation;
 			this.fortificationContinentOptimisation = fortificationContinentOptimisation;
 			this.fortificationRepeatMovesOptimisation = fortificationRepeatMovesOptimisation;

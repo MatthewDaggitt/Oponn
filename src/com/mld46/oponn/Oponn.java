@@ -47,6 +47,7 @@ public class Oponn extends SimAgent
 	private final boolean ATTACK_AGGRESSIVE_OPTIMISATION = true; 
 	private final boolean ATTACK_REPEAT_MOVES_OPTIMISATION = true; 
 	private final boolean ATTACK_PARTIAL_ORDER_OPTIMISATION = false;
+	private final boolean ATTACK_UNTIL_DEAD_OPTIMISATION = true;
 	private final boolean INVASION_OPTIMISATION = true;
 	private final boolean FORTIFICATION_CONTINENT_OPTIMISATION = true; 
 	private final boolean FORTIFICATION_REPEAT_MOVES_OPTIMISATION = true; 
@@ -89,6 +90,7 @@ public class Oponn extends SimAgent
 			ATTACK_AGGRESSIVE_OPTIMISATION,
 			ATTACK_REPEAT_MOVES_OPTIMISATION,
 			ATTACK_PARTIAL_ORDER_OPTIMISATION,
+			ATTACK_UNTIL_DEAD_OPTIMISATION,
 			INVASION_OPTIMISATION,
 			FORTIFICATION_CONTINENT_OPTIMISATION,
 			FORTIFICATION_REPEAT_MOVES_OPTIMISATION,
@@ -111,6 +113,7 @@ public class Oponn extends SimAgent
 			ATTACK_AGGRESSIVE_OPTIMISATION,
 			ATTACK_REPEAT_MOVES_OPTIMISATION,
 			ATTACK_PARTIAL_ORDER_OPTIMISATION,
+			ATTACK_UNTIL_DEAD_OPTIMISATION,
 			INVASION_OPTIMISATION,
 			FORTIFICATION_CONTINENT_OPTIMISATION,
 			FORTIFICATION_REPEAT_MOVES_OPTIMISATION,
@@ -205,7 +208,7 @@ public class Oponn extends SimAgent
 	public void placeInitialArmies(int numberOfArmies)
 	{
 		Debug.output("",0);
-		Debug.output("Placing initial armies",1);
+		Debug.output("Placing " + numberOfArmies + " initial armies",1);
 
 		boardState.turnCount = getTurnCount();
 		boardState.currentPhase = Phase.INITIAL_PLACEMENT;
@@ -224,8 +227,6 @@ public class Oponn extends SimAgent
 			numberOfArmies -= placement.armies;
 		}
 
-		boardState.initialPlacementRound += 1;
-		
 		Debug.output("Exiting initial placement",1);
 	}
 
@@ -306,7 +307,7 @@ public class Oponn extends SimAgent
 		if(lastAttack == null)
 		{
 			Debug.output("",0);
-			Debug.output("entering placing phase",1);
+			Debug.output("entering placing phase (" + numberOfArmies + " armies)",1);
 			
 			boardState.currentPhase = Phase.PLACEMENT;
 		}
@@ -357,8 +358,8 @@ public class Oponn extends SimAgent
 			if(RETAIN_ROOT && result != SimBoard.DEFENDERS_DESTROYED)
 			{
 				// Then there is an outstanding attackOutcome sitting at the top of the tree which needs to be removed.
-				outcome = new AttackOutcome((short)(lastAttack.attackingArmies-countries[lastAttack.attackerCC].getArmies()),
-											(short)(lastAttack.defendingArmies-countries[lastAttack.defenderCC].getArmies()),
+				outcome = new AttackOutcome(lastAttack.attackingArmies-countries[lastAttack.attackerCC].getArmies(),
+											lastAttack.defendingArmies-countries[lastAttack.defenderCC].getArmies(),
 											Float.NaN,
 											false);
 			}
@@ -459,7 +460,7 @@ public class Oponn extends SimAgent
 			Debug.output("Game over - " + message, 1);
 		}
 		
-		System.out.println("Message: " + message);
+		//System.out.println("Message: " + message);
 		return null;
 	}
 	
