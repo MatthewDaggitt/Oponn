@@ -19,7 +19,7 @@ public class Debug
 	static
 	{
 		frame.add(new JScrollPane(area));
-		frame.setSize(new Dimension(600,300));
+		frame.setSize(new Dimension(400,300));
 		area.setEditable(false);
 	}
 	

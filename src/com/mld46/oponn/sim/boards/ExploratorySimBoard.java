@@ -781,7 +781,7 @@ public class ExploratorySimBoard extends SimBoard
 				{
 					for(int destinationCC : validDestinationCCs)
 					{
-						for(int armies = 1; armies <= moveableArmies; armies++)
+						for(int armies : sparseIndices(moveableArmies))
 						{
 							moves.add(new Fortification(armies,sourceCC,destinationCC,true));
 						}
@@ -822,9 +822,9 @@ public class ExploratorySimBoard extends SimBoard
 							!(fortificationRepeatMovesOptimisation && fortificationsMade[sourceCC][destinationCC]) &&
 							!(destination.getContinent() == continent && countriesPlayerMissingInContinent[currentPlayer][continent] == 0 && !MapStats.isValidFortificationMoveInOwnedContinent(sourceCC,destinationCC)))
 						{
-							for(int i = 1; i <= moveableArmies; i++)
+							for(int armies : sparseIndices(moveableArmies))
 							{
-								moves.add(new Fortification(i,sourceCC,destinationCC,false));
+								moves.add(new Fortification(armies,sourceCC,destinationCC,false));
 							}
 						}
 					}
@@ -834,6 +834,31 @@ public class ExploratorySimBoard extends SimBoard
 		moves.add(new NextPhase(Phase.CARDS, Phase.FORTIFICATION, getNextPlayer()));
 	}
 	
+	private int [] sparseIndices(int maxArmies)
+	{
+		int suggestions = 10;
+		
+		int [] indices;
+		if(maxArmies < suggestions)
+		{
+			indices = new int[maxArmies];
+			for(int i = 0; i < maxArmies; i++)
+			{
+				indices[i] = i+1;
+			}
+		}
+		else
+		{
+			indices = new int[suggestions];
+			double inc = (maxArmies-1)/(suggestions-1);
+			for(int i = 0; i < suggestions; i++)
+			{
+				indices[i] = 1 + (int)(i*inc);
+			}
+		}
+		
+		return indices;
+	}
 
 	/****************/
 	/** Simulation **/
