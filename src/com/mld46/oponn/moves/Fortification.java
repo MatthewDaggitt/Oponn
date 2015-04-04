@@ -21,7 +21,7 @@ public class Fortification extends Move
 		this.destinationCC = destinationCC;
 		
 		this.sourceName = Move.countries[sourceCC].getName();
-		this.destinationName = Move.countries[destinationCC].getName();
+		this.destinationName = destinationCC != -1 ? Move.countries[destinationCC].getName() : "N/A";
 		
 		this.continentOptimisationFortification = continentOptimisationFortification;
 	}

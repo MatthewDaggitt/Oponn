@@ -569,7 +569,7 @@ public class SimBoard
 	{
 		if(numberOfPlaceableArmies > 0)
 		{
-			System.out.println("Error! Agent " + simAgents[currentPlayer].name() + " did not place all their armies");
+			System.out.println("Error! Agent " + simAgents[currentPlayer].name() + " did not place all their initial armies");
 		}
 		
 		int nextPlayer = (currentPlayer + 1) % numberOfPlayers;
@@ -1145,6 +1145,14 @@ public class SimBoard
 			throw new IllegalStateException("Wrong phase to request defending country");
 		}
 		return defendingCountry.getCode();
+	}
+	
+	public boolean canFortifyFrom(int cc, int player)
+	{
+		Country country = countries[cc];
+		return 	country.getOwner() == player &&
+				country.getMoveableArmies() > 0 &&
+				country.getArmies() > 1; 
 	}
 	
 	public boolean playerOwnsContinent(int player, int continent)

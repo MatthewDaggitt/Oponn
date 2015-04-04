@@ -49,9 +49,7 @@ public class Oponn extends SimAgent
 	private final boolean ATTACK_PARTIAL_ORDER_OPTIMISATION = false;
 	private final boolean ATTACK_UNTIL_DEAD_OPTIMISATION = true;
 	private final boolean INVASION_OPTIMISATION = true;
-	private final boolean FORTIFICATION_CONTINENT_OPTIMISATION = true; 
-	private final boolean FORTIFICATION_REPEAT_MOVES_OPTIMISATION = true; 
-	private final boolean FORTIFICATION_PARTIAL_ORDER_OPTIMISATION = false;
+	private final boolean FORTIFICATION_CONTINENT_OPTIMISATION = true;
 	
 	private boolean OPPONENT_MODELLING;
 	private final int MODELLING_TURN_LIMIT = 2;
@@ -92,9 +90,7 @@ public class Oponn extends SimAgent
 			ATTACK_PARTIAL_ORDER_OPTIMISATION,
 			ATTACK_UNTIL_DEAD_OPTIMISATION,
 			INVASION_OPTIMISATION,
-			FORTIFICATION_CONTINENT_OPTIMISATION,
-			FORTIFICATION_REPEAT_MOVES_OPTIMISATION,
-			FORTIFICATION_PARTIAL_ORDER_OPTIMISATION
+			FORTIFICATION_CONTINENT_OPTIMISATION
 		);
 		
 		Debug.output("Agent created (ID = " + newID + ")",0);
@@ -115,9 +111,7 @@ public class Oponn extends SimAgent
 			ATTACK_PARTIAL_ORDER_OPTIMISATION,
 			ATTACK_UNTIL_DEAD_OPTIMISATION,
 			INVASION_OPTIMISATION,
-			FORTIFICATION_CONTINENT_OPTIMISATION,
-			FORTIFICATION_REPEAT_MOVES_OPTIMISATION,
-			FORTIFICATION_PARTIAL_ORDER_OPTIMISATION
+			FORTIFICATION_CONTINENT_OPTIMISATION
 		);
 		
 		setup();
@@ -406,13 +400,21 @@ public class Oponn extends SimAgent
 		{
 			boardState.playerNumberOfCards[i] = getPlayerCards(i);
 		}
+		Arrays.fill(boardState.fortifiedCountries,false);
 		
 		Move move = tree.getFortificationMove(boardState);
 		
 		while(!(move instanceof NextPhase))
 		{
 			Fortification f = (Fortification) move;
-			makeFortification(f.armies,f.sourceCC,f.destinationCC);
+			if(f.destinationCC == -1)
+			{
+				boardState.fortifiedCountries[f.sourceCC] = true;
+			}
+			else
+			{
+				makeFortification(f.armies,f.sourceCC,f.destinationCC);
+			}
 			
 			move = tree.getFortificationMove(boardState);
 		}

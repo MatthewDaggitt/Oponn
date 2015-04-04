@@ -3,12 +3,10 @@ package com.mld46.oponn.sim.boards;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map.Entry;
 
 import com.mld46.oponn.BattleSim;
 import com.mld46.oponn.BoardState;
 import com.mld46.oponn.CardManager;
-import com.mld46.oponn.MapStats;
 import com.mld46.oponn.moves.*;
 import com.mld46.oponn.sim.agents.SimAgent;
 import com.sillysoft.lux.Card;
@@ -25,8 +23,6 @@ public class ExploratorySimBoard extends SimBoard
 	private final boolean attackUntilDeadOptimisation;
 	private final boolean invasionOptimisation;
 	private final boolean fortificationContinentOptimisation;
-	private final boolean fortificationRepeatMovesOptimisation;
-	private final boolean fortificationPartialOrderOptimisation;
 	
 	// Partial order variables
 	
@@ -34,14 +30,15 @@ public class ExploratorySimBoard extends SimBoard
 	private int minAttackSourceCC;
 	private int minAttackDestinationCC;
 	private boolean initiatedWithInvasion;
-	private int minFortificationSourceCC;
-	private int minFortificationDestinationCC;
 	
-	// Attack phase
+	// Partial orders
 	
 	private boolean [][] attacksMade;
-	private boolean [][] fortificationsMade;
 	
+	// Other
+	
+	private boolean [] fortifiedCountries;
+
 	/*****************/
 	/** Constructor **/
 	/*****************/
@@ -61,11 +58,10 @@ public class ExploratorySimBoard extends SimBoard
 		attackUntilDeadOptimisation = boardState.attackUntilDeadOptimisation;
 		invasionOptimisation = boardState.invasionOptimisation;
 		fortificationContinentOptimisation = boardState.fortificationContinentOptimisation;
-		fortificationRepeatMovesOptimisation = boardState.fortificationRepeatMovesOptimisation;
-		fortificationPartialOrderOptimisation = boardState.fortificationPartialOrderOptimisation;
 		
-		fortificationsMade = new boolean[numberOfCountries][numberOfCountries];
 		attacksMade = new boolean[numberOfCountries][numberOfCountries];
+		
+		fortifiedCountries = new boolean[numberOfCountries];
 	}
 	
 	@Override
@@ -103,19 +99,7 @@ public class ExploratorySimBoard extends SimBoard
 				break;
 				
 			case FORTIFICATION:
-				if(fortificationRepeatMovesOptimisation)
-				{
-					for(int cc1 = 0; cc1 < numberOfCountries; cc1++)
-					{
-						for(int cc2 = 0; cc2 < numberOfCountries; cc2++)
-						{
-							fortificationsMade[cc1][cc2] = false;
-						}
-					}
-				}
-				
-				minFortificationSourceCC = 0;
-				minFortificationDestinationCC = 0;
+				fortifiedCountries = Arrays.copyOf(boardState.fortifiedCountries, numberOfCountries);
 				break;
 		}
 	}
@@ -223,26 +207,14 @@ public class ExploratorySimBoard extends SimBoard
 		else if(move instanceof Fortification)
 		{
 			Fortification f = (Fortification) move;
-			fortifyArmies(f.armies,f.sourceCC,f.destinationCC);
 			
-			if(fortificationRepeatMovesOptimisation)
+			if(f.destinationCC == -1)
 			{
-				fortificationsMade[f.sourceCC][f.destinationCC] = true;
-				fortificationsMade[f.destinationCC][f.sourceCC] = true;
+				fortifiedCountries[f.sourceCC] = true;
 			}
-			
-			if(fortificationPartialOrderOptimisation)
+			else
 			{
-				if(f.continentOptimisationFortification)
-				{
-					minFortificationSourceCC = 0;
-					minFortificationDestinationCC = 0;		
-				}
-				else
-				{
-					minFortificationSourceCC = f.sourceCC;
-					minFortificationDestinationCC = f.destinationCC;
-				}
+				fortifyArmies(f.armies,f.sourceCC,f.destinationCC);
 			}
 		}
 		else if(move instanceof NextPhase)
@@ -651,40 +623,7 @@ public class ExploratorySimBoard extends SimBoard
 		return moves;
 	}
 	
-	private List<Move> getFortificationMoves()
-	{
-		List<Move> moves = new ArrayList<Move>();
-		
-		if(fortificationContinentOptimisation)
-		{
-			// For each continent owned, check for optimal reinforcement moves
-			for(int continent = 0; continent < numberOfContinents; continent++)
-			{
-				if(countriesPlayerMissingInContinent[currentPlayer][continent] == 0)
-				{
-					getCompulsoryInternalContinentFortifications(moves,continent);
-					
-					if(!moves.isEmpty())
-					{
-						return moves;
-					}
-					
-					getOtherInternalContinentFortifications(moves,continent);
-					
-					if(!moves.isEmpty())
-					{
-						return moves;
-					}
-				}
-			}
-		}
-		
-		// Otherwise consider all moves
-		getOtherFortificationMoves(moves);
-		
-		return moves;
-	}
-	
+	/**
 	private void getCompulsoryInternalContinentFortifications(List<Move> moves, int continent)
 	{
 		Country sourceCountry;
@@ -747,119 +686,44 @@ public class ExploratorySimBoard extends SimBoard
 			}
 		}
 	}
+	**/
 	
-	private void getOtherInternalContinentFortifications(List<Move> moves, int continent)
+	
+	private List<Move> getFortificationMoves()
 	{
-		int moveableArmies;		
-		Country sourceCountry;
-		List<Integer> validDestinationCCs;
+		List<Move> moves = new ArrayList<Move>();
 		
-		List<Integer> internalCountries = MapStats.getContinentInternalCountries(continent);
-		
-		for(int sourceCC : internalCountries)
+		int cc = 0;
+		while(cc != numberOfCountries &&
+				(!canFortifyFrom(cc,currentPlayer) ||
+				fortifiedCountries[cc] ||
+				countries[cc].getFriendlyAdjoiningCodeList().length == 0))
 		{
-			sourceCountry = countries[sourceCC];
-			moveableArmies = Math.min(sourceCountry.getMoveableArmies(),sourceCountry.getArmies()-1);
-			
-			if(moveableArmies > 0)
-			{
-				validDestinationCCs = new ArrayList<Integer>();
-				for(int destinationCC : sourceCountry.getAdjoiningCodeList())
-				{
-					if(!(fortificationRepeatMovesOptimisation && fortificationsMade[sourceCC][destinationCC]) &&
-						MapStats.isValidFortificationMoveInOwnedContinent(sourceCC,destinationCC))
-					{
-						validDestinationCCs.add(destinationCC);
-					}
-				}
-				
-				if(validDestinationCCs.size() == 1)
-				{
-					moves.add(new Fortification(moveableArmies,sourceCC,validDestinationCCs.get(0),true));
-				}
-				else
-				{
-					for(int destinationCC : validDestinationCCs)
-					{
-						for(int armies : sparseIndices(moveableArmies))
-						{
-							moves.add(new Fortification(armies,sourceCC,destinationCC,true));
-						}
-					}
-				}
-				
-				return;
-			}
+			cc++;
 		}
-	}
 	
-	private void getOtherFortificationMoves(List<Move> moves)
-	{
-		Country sourceCountry;
-		int continent;
-		int moveableArmies;
-		int destinationCC;
-		int destinationStartCode;
-		
-		int sourceStartCode = fortificationPartialOrderOptimisation ? minFortificationSourceCC : 0;
-		for(int sourceCC = sourceStartCode; sourceCC < numberOfCountries; sourceCC++)
+		if(cc == numberOfCountries)
 		{
-			sourceCountry = countries[sourceCC];
-			
-			if(sourceCountry.getOwner() == currentPlayer)
-			{
-				continent = sourceCountry.getContinent();
-				moveableArmies = Math.min(sourceCountry.getMoveableArmies(), sourceCountry.getArmies()-1);
-				
-				if(moveableArmies > 0)
-				{
-					destinationStartCode = fortificationPartialOrderOptimisation ? minFortificationDestinationCC : 0;
-					for(Country destination : sourceCountry.getAdjoiningList())
-					{
-						destinationCC = destination.getCode();
-						if(destinationCC >= destinationStartCode &&
-							destination.getOwner() == currentPlayer && 
-							!(fortificationRepeatMovesOptimisation && fortificationsMade[sourceCC][destinationCC]) &&
-							!(destination.getContinent() == continent && countriesPlayerMissingInContinent[currentPlayer][continent] == 0 && !MapStats.isValidFortificationMoveInOwnedContinent(sourceCC,destinationCC)))
-						{
-							for(int armies : sparseIndices(moveableArmies))
-							{
-								moves.add(new Fortification(armies,sourceCC,destinationCC,false));
-							}
-						}
-					}
-				}
-			}
-		}
-		moves.add(new NextPhase(Phase.CARDS, Phase.FORTIFICATION, getNextPlayer()));
-	}
-	
-	private int [] sparseIndices(int maxArmies)
-	{
-		int suggestions = 10;
-		
-		int [] indices;
-		if(maxArmies < suggestions)
-		{
-			indices = new int[maxArmies];
-			for(int i = 0; i < maxArmies; i++)
-			{
-				indices[i] = i+1;
-			}
+			moves.add(new NextPhase(Phase.CARDS, Phase.FORTIFICATION, getNextPlayer()));
 		}
 		else
 		{
-			indices = new int[suggestions];
-			double inc = (maxArmies-1)/(suggestions-1);
-			for(int i = 0; i < suggestions; i++)
+			Country country = countries[cc];
+			int moveableArmies = Math.min(country.getMoveableArmies(), country.getArmies()-1);
+			int [] armyIndices = sparseIndices(moveableArmies);
+			
+			for(int nc : country.getFriendlyAdjoiningCodeList())
 			{
-				indices[i] = 1 + (int)(i*inc);
+				for(int armies : armyIndices)
+				{
+					moves.add(new Fortification(armies, cc, nc, false));
+				}
 			}
+			moves.add(new Fortification(-1, cc, -1, false));
 		}
-		
-		return indices;
+		return moves;
 	}
-
+	
 	/****************/
 	/** Simulation **/
 	/****************/
@@ -895,28 +759,41 @@ public class ExploratorySimBoard extends SimBoard
 	}
 
 	@Override
-	protected void setupFortificationPhase()
-	{
-		super.setupFortificationPhase();
-		
-		minFortificationSourceCC = 0;
-		minFortificationDestinationCC = 0;
-		
-		if(fortificationRepeatMovesOptimisation)
-		{
-			for(boolean [] row : fortificationsMade)
-			{
-				Arrays.fill(row, false);
-			}
-		}
-	}
-
-	@Override
 	protected void executeAttackPlacement()
 	{
 		minAttackSourceCC = 0;
 		minAttackDestinationCC = 0;
 		minPlacementCC = 0;
 		super.executeAttackPlacement();
+	}
+
+	/***********/
+	/** Other **/
+	/***********/
+	
+	private int [] sparseIndices(int maxArmies)
+	{
+		int suggestions = 10;
+		
+		int [] indices;
+		if(maxArmies < suggestions)
+		{
+			indices = new int[maxArmies];
+			for(int i = 0; i < maxArmies; i++)
+			{
+				indices[i] = i+1;
+			}
+		}
+		else
+		{
+			indices = new int[suggestions];
+			double inc = (maxArmies-1)/(suggestions-1);
+			for(int i = 0; i < suggestions; i++)
+			{
+				indices[i] = 1 + (int)(i*inc);
+			}
+		}
+		
+		return indices;
 	}
 }

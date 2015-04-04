@@ -34,8 +34,6 @@ public class BoardState
 		public final boolean attackUntilDeadOptimisation;
 		public final boolean invasionOptimisation;
 		public final boolean fortificationContinentOptimisation;
-		public final boolean fortificationRepeatMovesOptimisation;
-		public final boolean fortificationPartialOrderOptimisation;
 		
 	// Mutable state
 		
@@ -60,6 +58,10 @@ public class BoardState
 		public int defendingCountry;
 		public int defendingPlayer;
 		
+		// Fortification phase
+		
+		public boolean [] fortifiedCountries;
+		
 	public BoardState(
 		Board board,
 		int agentID,
@@ -69,9 +71,7 @@ public class BoardState
 		boolean attackPartialOrderOptimisation,
 		boolean attackUntilDeadOptimisation,
 		boolean invasionOptimisation,
-		boolean fortificationContinentOptimisation,
-		boolean fortificationRepeatMovesOptimisation,
-		boolean fortificationPartialOrderOptimisation)
+		boolean fortificationContinentOptimisation)
 	{
 				
 		numberOfPlayers = board.getNumberOfPlayers();
@@ -98,6 +98,7 @@ public class BoardState
 		currentPlayer = agentID;
 		
 		playerNumberOfCards = new int[numberOfPlayers];
+		fortifiedCountries = new boolean[numberOfCountries];
 		
 		this.placementPartialOrderOptimisation = placementPartialOrderOptimisation;
 		this.attackAggressiveOptimisation = attackAggressiveOptimisation;
@@ -106,8 +107,6 @@ public class BoardState
 		this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
 		this.invasionOptimisation = invasionOptimisation;
 		this.fortificationContinentOptimisation = fortificationContinentOptimisation;
-		this.fortificationRepeatMovesOptimisation = fortificationRepeatMovesOptimisation;
-		this.fortificationPartialOrderOptimisation = fortificationPartialOrderOptimisation;
 	}
 	
 	public BoardState(
@@ -119,9 +118,7 @@ public class BoardState
 			boolean attackPartialOrderOptimisation,
 			boolean attackUntilDeadOptimisation,
 			boolean invasionOptimisation,
-			boolean fortificationContinentOptimisation,
-			boolean fortificationRepeatMovesOptimisation,
-			boolean fortificationPartialOrderOptimisation)
+			boolean fortificationContinentOptimisation)
 		{
 					
 			numberOfPlayers = simBoard.getNumberOfPlayers();
@@ -148,6 +145,7 @@ public class BoardState
 			currentPlayer = agentID;
 			
 			playerNumberOfCards = new int[numberOfPlayers];
+			fortifiedCountries = new boolean[numberOfCountries];
 			
 			this.placementPartialOrderOptimisation = placementPartialOrderOptimisation;
 			this.attackAggressiveOptimisation = attackAggressiveOptimisation;
@@ -156,8 +154,6 @@ public class BoardState
 			this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
 			this.invasionOptimisation = invasionOptimisation;
 			this.fortificationContinentOptimisation = fortificationContinentOptimisation;
-			this.fortificationRepeatMovesOptimisation = fortificationRepeatMovesOptimisation;
-			this.fortificationPartialOrderOptimisation = fortificationPartialOrderOptimisation;
 		}
 	
 	public void transferMutableState(BoardState bs)
