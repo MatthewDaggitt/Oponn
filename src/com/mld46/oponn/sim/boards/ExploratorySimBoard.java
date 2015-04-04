@@ -295,6 +295,8 @@ public class ExploratorySimBoard extends SimBoard
 		}
 	}
 	
+	// Country selection
+	
 	private List<Move> getCountrySelectionMoves()
 	{
 		List<Move> moves = new ArrayList<Move>();
@@ -312,6 +314,8 @@ public class ExploratorySimBoard extends SimBoard
 		}
 		return moves;
 	}
+	
+	// Cards
 	
 	private List<Move> getCardMoves(Phase phase)
 	{
@@ -336,6 +340,8 @@ public class ExploratorySimBoard extends SimBoard
 		}
 		return moves;
 	}
+	
+	// Placements
 	
 	private List<Move> getInitialPlacementMoves()
 	{
@@ -375,6 +381,7 @@ public class ExploratorySimBoard extends SimBoard
 			}
 			
 			int numberOfPlacements = possiblePlacements.size();
+			int [] armyIndices = sparseIndices(numberOfPlaceableArmies);
 			
 			if(placementPartialOrderOptimisation)
 			{
@@ -382,9 +389,9 @@ public class ExploratorySimBoard extends SimBoard
 				for(int i = 0; i < numberOfPlacements-1; i++)
 				{
 					cc = possiblePlacements.get(i).getCode();
-					for(int j = 1; j <= numberOfPlaceableArmies; j++)
+					for(int armies : armyIndices)
 					{
-						moves.add(new InitialPlacement(cc,j));
+						moves.add(new InitialPlacement(cc,armies));
 					}
 				}
 				
@@ -394,9 +401,9 @@ public class ExploratorySimBoard extends SimBoard
 			{
 				for(Country targetCountry : possiblePlacements)
 				{
-					for(int j = 1; j <= numberOfPlaceableArmies; j++)
+					for(int armies : armyIndices)
 					{
-						moves.add(new InitialPlacement(targetCountry.getCode(),j));
+						moves.add(new InitialPlacement(targetCountry.getCode(), armies));
 					}
 				}
 			}
@@ -429,6 +436,7 @@ public class ExploratorySimBoard extends SimBoard
 			}
 			
 			int numberOfPlacements = possiblePlacements.size();
+			int [] armyIndices = sparseIndices(numberOfPlaceableArmies);
 			
 			if(placementPartialOrderOptimisation)
 			{
@@ -436,9 +444,9 @@ public class ExploratorySimBoard extends SimBoard
 				for(int i = 0; i < numberOfPlacements-1; i++)
 				{
 					cc = possiblePlacements.get(i).getCode();
-					for(int j = 1; j <= numberOfPlaceableArmies; j++)
+					for(int armies : armyIndices)
 					{
-						moves.add(new Placement(cc,j,phase));
+						moves.add(new Placement(cc,armies,phase));
 					}
 				}
 				
@@ -448,9 +456,9 @@ public class ExploratorySimBoard extends SimBoard
 			{
 				for(Country targetCountry : possiblePlacements)
 				{
-					for(int j = 1; j <= numberOfPlaceableArmies; j++)
+					for(int armies : armyIndices)
 					{
-						moves.add(new Placement(targetCountry.getCode(), j, phase));
+						moves.add(new Placement(targetCountry.getCode(), armies, phase));
 					}
 				}
 			}
@@ -458,168 +466,218 @@ public class ExploratorySimBoard extends SimBoard
 		
 		return moves;
 	}
+
+	// Attacks
 	
 	private List<Move> getAttackMoves()
 	{
-		List<Move> moves = new ArrayList<Move>();
-		int attackers, defenders;
-		int attackerCC, defenderCC;
-		
-		if(attackState == AttackState.START)
+		switch(attackState)
 		{
-			Country attackingCountry;
-			int startSourceIndex = attackPartialOrderOptimisation ? minAttackSourceCC : 0;
+			case START: 	return getAttackStartMoves();
+			case EXECUTE: 	return getAttackExecuteMoves();
+			case INVADE: 	return getAttackInvadeMoves();
+			case CASH:		return getCardMoves(Phase.ATTACK);
+			case PLACE:		return getPlacementMoves(Phase.ATTACK);
+			default:		return null;
+		}
+	}
+	
+	private List<Move> getAttackStartMoves()
+	{
+		List<Move> moves = new ArrayList<Move>();
+	
+		Country attackingCountry;
+		int startSourceIndex = attackPartialOrderOptimisation ? minAttackSourceCC : 0;
+		
+		for(int attackerCC = startSourceIndex; attackerCC < numberOfCountries; attackerCC++)
+		{
+			attackingCountry = countries[attackerCC];
+			int attackers = attackingCountry.getArmies();
 			
-			for(attackerCC = startSourceIndex; attackerCC < numberOfCountries; attackerCC++)
+			if(attackingCountry.getOwner() == currentPlayer && attackers > 1)
 			{
-				attackingCountry = countries[attackerCC];
-				attackers = attackingCountry.getArmies();
+				int startDestinationIndex = attackPartialOrderOptimisation ? minAttackDestinationCC : 0;
 				
-				if(attackingCountry.getOwner() == currentPlayer && attackers > 1)
+				for(Country defendingCountry : attackingCountry.getAdjoiningList())
 				{
-					int startDestinationIndex = attackPartialOrderOptimisation ? minAttackDestinationCC : 0;
+					int defenderCC = defendingCountry.getCode();
+					int defenders = defendingCountry.getArmies();
 					
-					for(Country defendingCountry : attackingCountry.getAdjoiningList())
+					if(defendingCountry.getOwner() != currentPlayer && defenderCC >= startDestinationIndex && 
+							!(attackRepeatMovesOptimisation && attacksMade[attackerCC][defenderCC]) &&
+							!BattleSim.unfavourableForAttacker(attackers-1,defenders))
 					{
-						defenderCC = defendingCountry.getCode();
-						defenders = defendingCountry.getArmies();
-						
-						if(defendingCountry.getOwner() != currentPlayer && defenderCC >= startDestinationIndex && 
-								!(attackRepeatMovesOptimisation && attacksMade[attackerCC][defenderCC]) &&
-								!BattleSim.unfavourableForAttacker(attackers-1,defenders))
+						moves.add(new Attack(attackerCC,defenderCC,attackers,defenders, false));
+						if(attackUntilDeadOptimisation && attackers > 2)
 						{
-							moves.add(new Attack(attackerCC,defenderCC,attackers,defenders, false));
-							if(attackUntilDeadOptimisation && attackers > 2)
-							{
-								moves.add(new Attack(attackerCC,defenderCC,attackers,defenders, true));
-							}
+							moves.add(new Attack(attackerCC,defenderCC,attackers,defenders, true));
 						}
 					}
 				}
 			}
+		}
+		
+		if(attackAggressiveOptimisation && remainingPlayers == 2)
+		{
+			Attack a;
+			boolean optimalAttacksExhausted = true;
 			
-			if(attackAggressiveOptimisation && remainingPlayers == 2)
+			for(Move m : moves)
 			{
-				Attack a;
-				boolean optimalAttacksExhausted = true;
-				
-				for(Move m : moves)
+				a = (Attack) m;
+				if(BattleSim.favourableForAttacker(a.attackingArmies-1,a.defendingArmies))
 				{
-					a = (Attack) m;
-					if(BattleSim.favourableForAttacker(a.attackingArmies-1,a.defendingArmies))
-					{
-						optimalAttacksExhausted = false;
-					}
-				}
-				
-				if(optimalAttacksExhausted)
-				{
-					moves.add(new NextPhase(Phase.FORTIFICATION, Phase.ATTACK, currentPlayer));
+					optimalAttacksExhausted = false;
 				}
 			}
-			else
+			
+			if(optimalAttacksExhausted)
 			{
 				moves.add(new NextPhase(Phase.FORTIFICATION, Phase.ATTACK, currentPlayer));
 			}
 		}
-		else if(attackState == AttackState.EXECUTE)
+		else
 		{
-			attackers = attackingCountry.getArmies();
-			defenders = defendingCountry.getArmies();
-			
-			if(attackUntilDeadOptimisation && attackUntilDead)
-			{
-				for(AttackOutcome outcome : BattleSim.getAttackOutcomes(attackers-1, defenders))
-				{
-					moves.add(outcome);
-				}
-			}
-			else
-			{
-				if(attackers == 2 && defenders == 1)
-				{
-					moves.add(new AttackOutcome(0,1,BattleSim.a1_d1_al0,true));
-					moves.add(new AttackOutcome(1,0,BattleSim.a1_d1_al1,false));
-				}
-				else if(attackers == 3 && defenders == 1)
-				{
-					moves.add(new AttackOutcome(0,1,BattleSim.a2_d1_al0,true));
-					moves.add(new AttackOutcome(1,0,BattleSim.a2_d1_al1,false));
-				}
-				else if(attackers >= 4 && defenders == 1)
-				{		
-					moves.add(new AttackOutcome(0,1,BattleSim.a3_d1_al0,true));
-					moves.add(new AttackOutcome(1,0,BattleSim.a3_d1_al1,false));
-				}
-				else if(attackers == 2 && defenders >= 2)
-				{
-					moves.add(new AttackOutcome(0,1,BattleSim.a1_d2_al0,false));
-					moves.add(new AttackOutcome(1,0,BattleSim.a1_d2_al1,false));
-				}
-				else if(attackers == 3 && defenders >= 2)
-				{
-					moves.add(new AttackOutcome(0,2,BattleSim.a2_d2_al0,defenders == 2));
-					moves.add(new AttackOutcome(1,1,BattleSim.a2_d2_al1,false));
-					moves.add(new AttackOutcome(2,0,BattleSim.a2_d2_al2,false));
-				}
-				else if(attackers >= 4 && defenders >= 2)
-				{
-					moves.add(new AttackOutcome(0,2,BattleSim.a3_d2_al0,defenders == 2));
-					moves.add(new AttackOutcome(1,1,BattleSim.a3_d2_al1,false));
-					moves.add(new AttackOutcome(2,0,BattleSim.a3_d2_al2,false));
-				}
-			}
-		}
-		else if(attackState == AttackState.INVADE)
-		{
-			boolean onlyLargest = false;
-			
-			if(invasionOptimisation)
-			{
-				List<Country> attackerHostileNeighbours = new ArrayList<Country>();
-				List<Country> defenderHostileNeighbours = new ArrayList<Country>();
-				
-				for(Country neighbour : attackingCountry.getAdjoiningList())
-				{
-					if(neighbour.getOwner() != currentPlayer)
-					{
-						attackerHostileNeighbours.add(neighbour);
-					}
-				}
-				
-				for(Country neighbour : defendingCountry.getAdjoiningList())
-				{
-					if(neighbour.getOwner() != currentPlayer)
-					{
-						defenderHostileNeighbours.add(neighbour);
-					}
-				}
-				
-				onlyLargest = defenderHostileNeighbours.containsAll(attackerHostileNeighbours);
-			}
-			
-			if(onlyLargest)
-			{
-				moves.add(new Invasion(attackingCountry.getCode(),defendingCountry.getCode(),attackingCountry.getArmies()-1));
-			}
-			else
-			{
-				attackers = attackingCountry.getArmies();
-				for(int i = Math.min(attackers-1,3); i < attackers; i++)
-				{
-					moves.add(new Invasion(attackingCountry.getCode(),defendingCountry.getCode(),i));
-				}
-			}
-		}
-		else if(attackState == AttackState.CASH)
-		{
-			return getCardMoves(Phase.ATTACK);
-		}
-		else if(attackState == AttackState.PLACE) 
-		{
-			return getPlacementMoves(Phase.ATTACK);
+			moves.add(new NextPhase(Phase.FORTIFICATION, Phase.ATTACK, currentPlayer));
 		}
 		
+		return moves;
+	}
+	
+	private List<Move> getAttackExecuteMoves()
+	{
+		List<Move> moves = new ArrayList<Move>();
+		int attackers = attackingCountry.getArmies();
+		int defenders = defendingCountry.getArmies();
+		
+		if(attackUntilDeadOptimisation && attackUntilDead)
+		{
+			for(AttackOutcome outcome : BattleSim.getAttackOutcomes(attackers-1, defenders))
+			{
+				moves.add(outcome);
+			}
+		}
+		else
+		{
+			if(attackers == 2 && defenders == 1)
+			{
+				moves.add(new AttackOutcome(0,1,BattleSim.a1_d1_al0,true));
+				moves.add(new AttackOutcome(1,0,BattleSim.a1_d1_al1,false));
+			}
+			else if(attackers == 3 && defenders == 1)
+			{
+				moves.add(new AttackOutcome(0,1,BattleSim.a2_d1_al0,true));
+				moves.add(new AttackOutcome(1,0,BattleSim.a2_d1_al1,false));
+			}
+			else if(attackers >= 4 && defenders == 1)
+			{		
+				moves.add(new AttackOutcome(0,1,BattleSim.a3_d1_al0,true));
+				moves.add(new AttackOutcome(1,0,BattleSim.a3_d1_al1,false));
+			}
+			else if(attackers == 2 && defenders >= 2)
+			{
+				moves.add(new AttackOutcome(0,1,BattleSim.a1_d2_al0,false));
+				moves.add(new AttackOutcome(1,0,BattleSim.a1_d2_al1,false));
+			}
+			else if(attackers == 3 && defenders >= 2)
+			{
+				moves.add(new AttackOutcome(0,2,BattleSim.a2_d2_al0,defenders == 2));
+				moves.add(new AttackOutcome(1,1,BattleSim.a2_d2_al1,false));
+				moves.add(new AttackOutcome(2,0,BattleSim.a2_d2_al2,false));
+			}
+			else if(attackers >= 4 && defenders >= 2)
+			{
+				moves.add(new AttackOutcome(0,2,BattleSim.a3_d2_al0,defenders == 2));
+				moves.add(new AttackOutcome(1,1,BattleSim.a3_d2_al1,false));
+				moves.add(new AttackOutcome(2,0,BattleSim.a3_d2_al2,false));
+			}
+		}
+		return moves;
+	}
+	
+	private List<Move> getAttackInvadeMoves()
+	{
+		List<Move> moves = new ArrayList<Move>();
+		int attackers = attackingCountry.getArmies();
+		boolean onlyLargest = false;
+		
+		if(invasionOptimisation)
+		{
+			List<Country> attackerHostileNeighbours = new ArrayList<Country>();
+			List<Country> defenderHostileNeighbours = new ArrayList<Country>();
+			
+			for(Country neighbour : attackingCountry.getAdjoiningList())
+			{
+				if(neighbour.getOwner() != currentPlayer)
+				{
+					attackerHostileNeighbours.add(neighbour);
+				}
+			}
+			
+			for(Country neighbour : defendingCountry.getAdjoiningList())
+			{
+				if(neighbour.getOwner() != currentPlayer)
+				{
+					defenderHostileNeighbours.add(neighbour);
+				}
+			}
+			
+			onlyLargest = defenderHostileNeighbours.containsAll(attackerHostileNeighbours);
+		}
+		
+		int attackerCC = attackingCountry.getCode();
+		int defenderCC = defendingCountry.getCode();
+		if(onlyLargest)
+		{
+			moves.add(new Invasion(attackerCC,defenderCC,attackers-1));
+		}
+		else
+		{
+			int minInvaders = Math.min(attackers-1,3);
+			int maxInvaders = attackers-1;
+			for(int extraArmies : sparseIndices(maxInvaders-minInvaders+1))					
+			{
+				moves.add(new Invasion(attackerCC, defenderCC, extraArmies + minInvaders - 1)); 
+			}
+		}
+		
+		return moves;
+	}
+	
+	// Fortifications
+	
+	private List<Move> getFortificationMoves()
+	{
+		List<Move> moves = new ArrayList<Move>();
+		
+		int cc = 0;
+		while(cc != numberOfCountries &&
+				(!canFortifyFrom(cc,currentPlayer) ||
+				fortifiedCountries[cc] ||
+				countries[cc].getFriendlyAdjoiningCodeList().length == 0))
+		{
+			cc++;
+		}
+	
+		if(cc == numberOfCountries)
+		{
+			moves.add(new NextPhase(Phase.CARDS, Phase.FORTIFICATION, getNextPlayer()));
+		}
+		else
+		{
+			Country country = countries[cc];
+			int moveableArmies = Math.min(country.getMoveableArmies(), country.getArmies()-1);
+			int [] armyIndices = sparseIndices(moveableArmies);
+			
+			for(int nc : country.getFriendlyAdjoiningCodeList())
+			{
+				for(int armies : armyIndices)
+				{
+					moves.add(new Fortification(armies, cc, nc, false));
+				}
+			}
+			moves.add(new Fortification(-1, cc, -1, false));
+		}
 		return moves;
 	}
 	
@@ -687,42 +745,6 @@ public class ExploratorySimBoard extends SimBoard
 		}
 	}
 	**/
-	
-	
-	private List<Move> getFortificationMoves()
-	{
-		List<Move> moves = new ArrayList<Move>();
-		
-		int cc = 0;
-		while(cc != numberOfCountries &&
-				(!canFortifyFrom(cc,currentPlayer) ||
-				fortifiedCountries[cc] ||
-				countries[cc].getFriendlyAdjoiningCodeList().length == 0))
-		{
-			cc++;
-		}
-	
-		if(cc == numberOfCountries)
-		{
-			moves.add(new NextPhase(Phase.CARDS, Phase.FORTIFICATION, getNextPlayer()));
-		}
-		else
-		{
-			Country country = countries[cc];
-			int moveableArmies = Math.min(country.getMoveableArmies(), country.getArmies()-1);
-			int [] armyIndices = sparseIndices(moveableArmies);
-			
-			for(int nc : country.getFriendlyAdjoiningCodeList())
-			{
-				for(int armies : armyIndices)
-				{
-					moves.add(new Fortification(armies, cc, nc, false));
-				}
-			}
-			moves.add(new Fortification(-1, cc, -1, false));
-		}
-		return moves;
-	}
 	
 	/****************/
 	/** Simulation **/
