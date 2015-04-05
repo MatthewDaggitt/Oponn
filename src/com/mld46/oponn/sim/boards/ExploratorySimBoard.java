@@ -818,4 +818,15 @@ public class ExploratorySimBoard extends SimBoard
 		
 		return indices;
 	}
+
+	public int getPositionalHash()
+	{
+		int [] position = new int[numberOfCountries*2];
+		for(int i = 0; i < numberOfCountries; i++)
+		{
+			position[i] = countries[i].getArmies();
+			position[i + numberOfCountries] = countries[i].getOwner();
+		}
+		return Arrays.hashCode(position);
+	}
 }
