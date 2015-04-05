@@ -13,7 +13,7 @@ import com.mld46.oponn.sim.agents.SimAgent;
 import com.sillysoft.lux.Card;
 import com.sillysoft.lux.Country;
 
-public class SimBoard
+public class SimulationBoard
 {
 	// Constants
 	public enum Phase { 
@@ -40,17 +40,14 @@ public class SimBoard
 	
 	private final int coreID;
 	
-	protected final Country [] countries;
-	private final Country [] originalCountries;
-	private final int [] initialContinentBonuses;
-	private final int [] currentContinentBonuses;
-	
-	protected static String [] realAgentNames;
-	protected static String [] simAgentNames;
-	
 	protected final int numberOfCountries;
 	protected final int numberOfContinents;
 	protected final int numberOfPlayers;
+	
+	protected final String [] agentNames;
+	
+	protected final Country [] countries;
+	private final int [] initialContinentBonuses;
 	
 	// Game settings
 		
@@ -64,6 +61,7 @@ public class SimBoard
 	
 	private final int [] playerCountries;
 	protected final int [][] countriesPlayerMissingInContinent;
+	private int [] currentContinentBonuses;
 	protected SimAgent [] simAgents;
 	private CardManager cardManager;
 	protected List<List<Card>> playerCards;
@@ -84,12 +82,12 @@ public class SimBoard
 	protected int [] initialArmiesLeftToPlace;
 	
 	// Placement phase
-	public int numberOfPlaceableArmies;
+	protected int numberOfPlaceableArmies;
 	
 	// Attack phase
-	private boolean hasInvadedACountry;
-	protected Country attackingCountry;
-	protected Country defendingCountry;
+	protected boolean hasInvadedACountry;
+	protected int attackingCC;
+	protected int defendingCC;
 	protected int attackingPlayer;
 	protected int defendingPlayer;
 	protected boolean attackUntilDead;
@@ -101,10 +99,8 @@ public class SimBoard
 	/** Constructor **/
 	/*****************/
 	
-	public SimBoard(Country [] originalCountries, BoardState boardState, SimAgent [] simAgents, CardManager cardManager, int coreID)
+	public SimulationBoard(BoardState boardState, SimAgent [] simAgents, CardManager cardManager, int coreID)
 	{
-		Move.countries = originalCountries;
-		
 		/*****************/
 		/** Board state **/
 		/*****************/
@@ -118,7 +114,7 @@ public class SimBoard
 		numberOfContinents = boardState.numberOfContinents;
 		initialContinentBonuses = boardState.initialContinentBonuses;
 		
-		realAgentNames = boardState.agentNames;
+		agentNames = boardState.agentNames;
 		
 		useCards = boardState.useCards;
 		transferCards = boardState.transferCards;
@@ -126,6 +122,7 @@ public class SimBoard
 		continentIncrease = boardState.continentIncrease;
 		cardProgression = boardState.cardProgression;
 		
+		countries = BoardState.cloneCountries(boardState.countries);
 		currentContinentBonuses = new int[numberOfContinents];
 		playerOutOnTurn = new int[numberOfPlayers];
 		playerPositions = new int[numberOfPlayers];
@@ -133,24 +130,6 @@ public class SimBoard
 		countriesPlayerMissingInContinent = new int[numberOfPlayers][numberOfContinents];
 		
 		initialArmiesLeftToPlace = new int[numberOfPlayers];
-		
-		this.originalCountries = originalCountries;
-		countries = new Country[numberOfCountries];
-		Country originalCountry;
-		for(int cc = 0; cc < numberOfCountries; cc++)
-		{
-			originalCountry = originalCountries[cc];
-			countries[cc] = new Country(cc,originalCountry.getContinent(),null);
-			countries[cc].setName(originalCountry.getName(), null);
-		}
-		for(int cc = 0; cc < numberOfCountries; cc++)
-		{
-	        int [] neighbourCCs = originalCountries[cc].getAdjoiningCodeList();
-	        for(int neighbourCC : neighbourCCs)
-	        {
-	            countries[cc].addToAdjoiningList(countries[neighbourCC], null);
-	        }
-		}
 				
 		playerCards = new ArrayList<List<Card>>(numberOfPlayers);
 		for(int player = 0; player < numberOfPlayers; player++)
@@ -202,7 +181,7 @@ public class SimBoard
 		currentPlayer = boardState.currentPlayer;
 		currentPhase = boardState.currentPhase;
 		
-		setupCountries();
+		setupCountries(boardState.countries);
 		setupCardState(boardState.playerNumberOfCards);
 		setupGeneralGameState();
 		setupPhaseGameState(boardState);
@@ -210,15 +189,16 @@ public class SimBoard
 		recalculateContinentBonuses();
 	}
 	
-	protected void setupCountries()
+	protected void setupCountries(Country [] oldCountries)
 	{
 		for(int cc = 0; cc < numberOfCountries; cc++)
 		{
-			Country country = countries[cc];
-			Country originalCountry = originalCountries[cc];
-
-			country.setOwner(originalCountry.getOwner(),null);
-			country.setArmies(originalCountry.getArmies(),null);
+			Country newCountry = countries[cc];
+			Country oldCountry = oldCountries[cc];
+			
+			newCountry.setArmies(oldCountry.getArmies(), null);
+			newCountry.setOwner(oldCountry.getOwner(), null);
+			newCountry.setMoveableArmies(oldCountry.getMoveableArmies(), null);
 		}
 	}
 	
@@ -345,20 +325,20 @@ public class SimBoard
 				
 			case ATTACK:
 				setupAttackPhase();
-				hasInvadedACountry = boardState.hasCapturedACountry;
+				hasInvadedACountry = boardState.hasInvadedACountry;
 				attackState = boardState.attackState;
 				
-				if(boardState.attackState == AttackState.INVADE)
+				attackingCC = boardState.attackingCC;
+				defendingCC = boardState.defendingCC;
+				if(attackingCC != -1)
 				{
-					attackingCountry = countries[boardState.attackingCountry];
-					defendingCountry = countries[boardState.defendingCountry];
-					attackingPlayer = attackingCountry.getOwner();
+					attackingPlayer = countries[attackingCC].getOwner();
 					defendingPlayer = boardState.defendingPlayer;
-					
-					if(playerCountries[defendingPlayer] == 0)
-					{
-						remainingPlayers++;
-					}
+				}
+				
+				if(boardState.attackState == AttackState.INVADE && playerCountries[defendingPlayer] == 0)
+				{
+					remainingPlayers++;
 				}
 				else if(boardState.attackState == AttackState.CASH)
 				{
@@ -371,10 +351,6 @@ public class SimBoard
 				break;
 				
 			case FORTIFICATION:
-				for(int i = 0; i < numberOfCountries; i++)
-				{
-					countries[i].setMoveableArmies(originalCountries[i].getMoveableArmies(), null);
-				}
 				break;
 				
 			default:
@@ -430,10 +406,7 @@ public class SimBoard
 				}
 				if(attackState == AttackState.INVADE)
 				{
-					int attackerCC = attackingCountry.getCode();
-					int defenderCC = defendingCountry.getCode();
-					
-					executeInvasion(simAgents[currentPlayer].moveArmiesIn(attackerCC,defenderCC));
+					executeInvasion(simAgents[currentPlayer].moveArmiesIn(attackingCC,defendingCC));
 					finishInvasion();
 				}
 				if(attackState == AttackState.CASH)
@@ -677,26 +650,26 @@ public class SimBoard
 		if(currentPhase != Phase.PLACEMENT && currentPhase != Phase.INITIAL_PLACEMENT 
 				&& (currentPhase != Phase.ATTACK || attackState != AttackState.PLACE))
 		{
-			throw new IllegalArgumentException("Player " + realAgentNames[currentPlayer] + 
+			throw new IllegalArgumentException("Player " + agentNames[currentPlayer] + 
 												" (" + currentPlayer + ") cannot place during " +
 												" phase " + currentPhase);
 		}
 		else if(numberOfArmies > numberOfPlaceableArmies)
 		{
-			throw new IllegalArgumentException("Player " + realAgentNames[currentPlayer] +
+			throw new IllegalArgumentException("Player " + agentNames[currentPlayer] +
 												" does not have " + numberOfArmies + " to place, " +
 												" only has " + numberOfPlaceableArmies);
 		}
 		else if(country.getOwner() != currentPlayer)
 		{
-			throw new IllegalArgumentException("Player " + realAgentNames[currentPlayer] + 
+			throw new IllegalArgumentException("Player " + agentNames[currentPlayer] + 
 					" (" + currentPlayer + ") " + " does not own " + 
 					country.getName() + " (" + cc +
 					") and therefore cannot reinforce it.");
 		}
 		else if(numberOfArmies < 0)
 		{
-			throw new IllegalArgumentException("Player " + realAgentNames[currentPlayer] + 
+			throw new IllegalArgumentException("Player " + agentNames[currentPlayer] + 
 					" (" + currentPlayer + ") " + " is trying to subtract armies from " + 
 					country.getName());
 		}
@@ -725,8 +698,10 @@ public class SimBoard
 	protected void setupAttackPhase()
 	{
 		hasInvadedACountry = false;
-		attackingCountry = null;
-		defendingCountry = null;
+		attackingCC = -1;
+		defendingCC = -1;
+		attackingPlayer = -1;
+		defendingPlayer = -1;
 
 		attackState = AttackState.START;
 	}
@@ -765,26 +740,25 @@ public class SimBoard
 			return DEFENDERS_DESTROYED;
 		}
 		
-		return attackingCountry.getArmies() == 1 ? ATTACKERS_DESTROYED : ATTACK_INCONCLUSIVE;
+		return countries[attackingCC].getArmies() == 1 ? ATTACKERS_DESTROYED : ATTACK_INCONCLUSIVE;
 	}
 	
-	protected void setupAttack(int attackerCode, int defenderCode, boolean attackUntilDead)
+	protected void setupAttack(int attackingCC, int defendingCC, boolean attackUntilDead)
 	{
-		Country attackingCountry = countries[attackerCode];
-		Country defendingCountry = countries[defenderCode];
-		
-		attackerLosses = 0;
-		defenderLosses = 0;
-		this.attackingCountry = attackingCountry;
-		this.defendingCountry = defendingCountry;
+		this.attackerLosses = 0;
+		this.defenderLosses = 0;
+		this.attackingCC = attackingCC;
+		this.defendingCC = defendingCC;
+		this.attackingPlayer = countries[attackingCC].getOwner();
+		this.defendingPlayer = countries[defendingCC].getOwner();
 		this.attackUntilDead = attackUntilDead;
-		attackState = AttackState.EXECUTE;
+		this.attackState = AttackState.EXECUTE;
 	}
 	
 	protected void executeAttack()
 	{
-		int aArmies = attackingCountry.getArmies()-1;
-		int dArmies = defendingCountry.getArmies();
+		int aArmies = countries[attackingCC].getArmies()-1;
+		int dArmies = countries[defendingCC].getArmies();
 		
 		if(!attackUntilDead)
 		{
@@ -801,6 +775,13 @@ public class SimBoard
 	
 	protected void finishAttack()
 	{
+		Country attackingCountry = countries[attackingCC];
+		Country defendingCountry = countries[defendingCC];
+		
+		if(attackingCountry.getArmies() <= attackerLosses)
+		{
+			System.out.println("Hmm");
+		}
 		attackingCountry.setArmies(attackingCountry.getArmies()-attackerLosses,null);
 		defendingCountry.setArmies(defendingCountry.getArmies()-defenderLosses,null);
 		
@@ -809,6 +790,8 @@ public class SimBoard
 	
 	protected void setupInvasion()
 	{
+		Country attackingCountry = countries[attackingCC];
+		Country defendingCountry = countries[defendingCC];
 		int continent = defendingCountry.getContinent();
 		
 		attackingPlayer = attackingCountry.getOwner();
@@ -824,6 +807,9 @@ public class SimBoard
 	
 	protected void executeInvasion(int armies)
 	{
+		Country attackingCountry = countries[attackingCC];
+		Country defendingCountry = countries[defendingCC];
+		
 		int minInvadingArmies = Math.min(attackingCountry.getArmies()-1,3);
 		int maxInvadingArmies = attackingCountry.getArmies()-1;
 		int invadingArmies = Math.min(Math.max(armies, minInvadingArmies), maxInvadingArmies);
@@ -834,13 +820,18 @@ public class SimBoard
 	
 	protected void finishInvasion()
 	{
-		hasInvadedACountry = true;
-		attackState = AttackState.START;
-		
 		if(playerCountries[defendingPlayer] == 0)
 		{
 			playerDefeated(defendingPlayer,attackingPlayer);
 		}
+		
+		hasInvadedACountry = true;
+		attackState = AttackState.START;
+		
+		attackingCC = -1;
+		defendingCC = -1;
+		attackingPlayer = -1;
+		defendingPlayer = -1;
 	}
 	
 	protected void playerDefeated(int player, int conquerer)
@@ -917,14 +908,14 @@ public class SimBoard
 		
 		if(currentPhase != Phase.FORTIFICATION)
 		{
-			throw new IllegalArgumentException("Player " + realAgentNames[currentPlayer] + 
+			throw new IllegalArgumentException("Player " + agentNames[currentPlayer] + 
 												" (" + currentPlayer + ") cannot fortify during " +
 												" phase " + currentPhase);
 		}
 		else if(sourceCountry.getOwner() != currentPlayer || destinationCountry.getOwner() != currentPlayer)
 		{
 			System.out.println(
-				"Player " + realAgentNames[currentPlayer] + 
+				"Player " + agentNames[currentPlayer] + 
 				" (" + currentPlayer + ") " + " does not own one of " + 
 				sourceCountry.getName() + " (" + sourceCC + ") or " +
 				destinationCountry.getName() + " (" + destinationCC + 
@@ -935,7 +926,7 @@ public class SimBoard
 		else if(numberOfArmies < 0)
 		{
 			System.out.println(
-				"Player " + realAgentNames[currentPlayer] + " (" + currentPlayer + ")" + 
+				"Player " + agentNames[currentPlayer] + " (" + currentPlayer + ")" + 
 				" tried to fortify a negative number of armies " +
 				" from " + sourceCountry.getName() + " (" + sourceCC + ")" +
 				" to " + destinationCountry.getName() + " (" + destinationCC + ")."
@@ -967,6 +958,11 @@ public class SimBoard
 	
 	protected void tearDownFortificationPhase()
 	{
+		for(Country country : countries)
+		{
+			country.setMoveableArmies(0, null);
+		}
+		
 		int nextPlayer = getNextPlayer();
 		if(nextPlayer < currentPlayer)
 		{
@@ -1135,7 +1131,7 @@ public class SimBoard
 		{
 			throw new IllegalStateException("Wrong phase to request attacking country");
 		}
-		return attackingCountry.getCode();
+		return attackingCC;
 	}
 	
 	public int getDefendingCountry()
@@ -1144,7 +1140,7 @@ public class SimBoard
 		{
 			throw new IllegalStateException("Wrong phase to request defending country");
 		}
-		return defendingCountry.getCode();
+		return defendingCC;
 	}
 	
 	public boolean canFortifyFrom(int cc, int player)
@@ -1192,7 +1188,7 @@ public class SimBoard
 	
 	public String getRealAgentName(int player)
 	{
-		return realAgentNames[player];
+		return agentNames[player];
 	}
 	
 	public String getSimAgentName(int player)

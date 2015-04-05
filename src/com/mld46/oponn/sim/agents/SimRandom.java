@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import com.mld46.oponn.sim.boards.SimBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard;
 import com.sillysoft.lux.Card;
 import com.sillysoft.lux.Country;
 
@@ -120,11 +120,11 @@ public class SimRandom extends SimAgent
 					
 					int result = makeAttack(attackerCode,defenderCode,true);
 					
-					if(result == SimBoard.ATTACKERS_DESTROYED)
+					if(result == SimulationBoard.ATTACKERS_DESTROYED)
 					{
 						possibleAttackers.remove(attackerIndex);
 					}
-					else if(result == SimBoard.DEFENDERS_DESTROYED)
+					else if(result == SimulationBoard.DEFENDERS_DESTROYED)
 					{
 						if(attacker.getArmies() == 1)
 						{

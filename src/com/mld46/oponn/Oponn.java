@@ -18,11 +18,11 @@ import com.mld46.oponn.moves.NextPhase;
 import com.mld46.oponn.moves.Placement;
 import com.mld46.oponn.sim.agents.SimAgent;
 import com.mld46.oponn.sim.agents.SimRandom;
-import com.mld46.oponn.sim.boards.ExploratorySimBoard;
-import com.mld46.oponn.sim.boards.ModellingSimBoard;
-import com.mld46.oponn.sim.boards.SimBoard;
-import com.mld46.oponn.sim.boards.SimBoard.AttackState;
-import com.mld46.oponn.sim.boards.SimBoard.Phase;
+import com.mld46.oponn.sim.boards.ExplorationBoard;
+import com.mld46.oponn.sim.boards.ModellingBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard.AttackState;
+import com.mld46.oponn.sim.boards.SimulationBoard.Phase;
 import com.sillysoft.lux.Board;
 import com.sillysoft.lux.Card;
 
@@ -65,7 +65,7 @@ public class Oponn extends SimAgent
 	
 	private BoardState boardState;
 	private CardManager cardManager;
-	private MCSTTree tree;
+	private MCTSTree tree;
 	
 	private Attack lastAttack = null;
 	private boolean [] playersEliminated;
@@ -81,39 +81,17 @@ public class Oponn extends SimAgent
 		
 		readSettings();
 		
-		boardState = new BoardState(
-			board,
-			ID,
-			PLACEMENT_PARTIAL_ORDER_OPTIMISATION,
-			ATTACK_AGGRESSIVE_OPTIMISATION,
-			ATTACK_REPEAT_MOVES_OPTIMISATION,
-			ATTACK_PARTIAL_ORDER_OPTIMISATION,
-			ATTACK_UNTIL_DEAD_OPTIMISATION,
-			INVASION_OPTIMISATION,
-			FORTIFICATION_CONTINENT_OPTIMISATION
-		);
+		boardState = new BoardState(board,ID);
 		
 		Debug.output("Agent created (ID = " + newID + ")",0);
 		setup();
 	}
 	
 	@Override
-	public void setSimPrefs(int newID, SimBoard simBoard)
+	public void setSimPrefs(int newID, SimulationBoard simBoard)
 	{
 		super.setSimPrefs(newID, simBoard);
-		
-		boardState = new BoardState(
-			simBoard,
-			ID,
-			PLACEMENT_PARTIAL_ORDER_OPTIMISATION,
-			ATTACK_AGGRESSIVE_OPTIMISATION,
-			ATTACK_REPEAT_MOVES_OPTIMISATION,
-			ATTACK_PARTIAL_ORDER_OPTIMISATION,
-			ATTACK_UNTIL_DEAD_OPTIMISATION,
-			INVASION_OPTIMISATION,
-			FORTIFICATION_CONTINENT_OPTIMISATION
-		);
-		
+		boardState = new BoardState(simBoard, ID);
 		setup();
 	}
 	
@@ -123,18 +101,34 @@ public class Oponn extends SimAgent
 		
 		SimAgent [] simAgents = createSimAgents();
 		
-		ExploratorySimBoard [] simBoards = new ExploratorySimBoard[CORES];
+		SimulationBoard [] simulationBoards = new SimulationBoard[CORES];
 		for(int i = 0; i < CORES; i++)
 		{
-			simBoards[i] = new ModellingSimBoard(countries, boardState, simAgents, cardManager, i, MODELLING_TURN_LIMIT);
+			simulationBoards[i] = new ModellingBoard(boardState,simAgents,cardManager, i, MODELLING_TURN_LIMIT);
 		}
+		
+		ExplorationBoard explorationBoard = new ExplorationBoard(
+			boardState, 
+			simAgents, 
+			cardManager, 
+			0,
+			PLACEMENT_PARTIAL_ORDER_OPTIMISATION,
+			ATTACK_AGGRESSIVE_OPTIMISATION,
+			ATTACK_REPEAT_MOVES_OPTIMISATION,
+			ATTACK_PARTIAL_ORDER_OPTIMISATION,
+			ATTACK_UNTIL_DEAD_OPTIMISATION,
+			INVASION_OPTIMISATION,
+			FORTIFICATION_CONTINENT_OPTIMISATION
+		);
 		
 		playersEliminated = new boolean [numberOfPlayers];
 		countryOwners = new int[numberOfCountries];
 		Arrays.fill(countryOwners, -1);
 		
-		tree = new MCSTTree(
-			simBoards,
+		tree = new MCTSTree
+		(
+			explorationBoard,
+			simulationBoards,
 			ID,
 			CORES,
 			ITERATIONS,
@@ -143,6 +137,8 @@ public class Oponn extends SimAgent
 			ATTACK_AGGRESSIVE_OPTIMISATION,
 			MOVE_SELECTION_POLICY
 		);
+		
+		Move.countries = countries;
 	}
 	
 	private SimAgent [] createSimAgents()
@@ -232,12 +228,14 @@ public class Oponn extends SimAgent
 		if(cardPhase)
 		{
 			// Normal card phase
-			
 			Debug.output("",0);
 			Debug.output("starting turn " + getTurnCount(),0);
 			
 			Debug.output("",0);
 			Debug.output("entering cards phase",1);
+			
+			boardState.currentPhase = Phase.CARDS;
+			boardState.turnCount = getTurnCount();
 			
 			int [] cardNumbers = new int[numberOfPlayers];
 			boolean [] playersEliminatedLastTurn = new boolean[numberOfPlayers];
@@ -251,9 +249,6 @@ public class Oponn extends SimAgent
 				}
 			}
 			cardManager.updateCardProgressionPosition(getNextCardSetValue(), cardNumbers, playersEliminatedLastTurn);
-			
-			boardState.currentPhase = Phase.CARDS;
-			boardState.turnCount = getTurnCount();
 		}
 		else
 		{
@@ -334,7 +329,7 @@ public class Oponn extends SimAgent
 		Debug.output("entering attack phase",1);
 		
 		boardState.currentPhase = Phase.ATTACK;
-		boardState.hasCapturedACountry = false;
+		boardState.hasInvadedACountry = false;
 		for(int i = 0; i < numberOfPlayers; i++)
 		{
 			boardState.playerNumberOfCards[i] = getPlayerCards(i);
@@ -347,13 +342,13 @@ public class Oponn extends SimAgent
 		while(move instanceof Attack)
 		{
 			lastAttack = (Attack) move;
-			boardState.defendingPlayer = countries[lastAttack.defenderCC].getOwner();
-			int result = makeAttack(lastAttack.attackerCC, lastAttack.defenderCC, lastAttack.attackUntilDead);
-			if(RETAIN_ROOT && result != SimBoard.DEFENDERS_DESTROYED)
+			boardState.defendingPlayer = countries[lastAttack.defendingCC].getOwner();
+			int result = makeAttack(lastAttack.attackingCC, lastAttack.defendingCC, lastAttack.attackUntilDead);
+			if(RETAIN_ROOT && result != SimulationBoard.DEFENDERS_DESTROYED)
 			{
 				// Then there is an outstanding attackOutcome sitting at the top of the tree which needs to be removed.
-				outcome = new AttackOutcome(lastAttack.attackingArmies-countries[lastAttack.attackerCC].getArmies(),
-											lastAttack.defendingArmies-countries[lastAttack.defenderCC].getArmies(),
+				outcome = new AttackOutcome(lastAttack.attackingArmies-countries[lastAttack.attackingCC].getArmies(),
+											lastAttack.defendingArmies-countries[lastAttack.defendingCC].getArmies(),
 											Float.NaN,
 											false);
 			}
@@ -363,7 +358,7 @@ public class Oponn extends SimAgent
 				outcome = null;
 			}
 			
-			if(result == SimBoard.DEFENDERS_DESTROYED && getPlayerIncome(boardState.defendingPlayer) == 0)
+			if(result == SimulationBoard.DEFENDERS_DESTROYED && getPlayerIncome(boardState.defendingPlayer) == 0)
 			{
 				playersEliminated[boardState.defendingPlayer] = true;
 			}
@@ -373,17 +368,15 @@ public class Oponn extends SimAgent
 			move = tree.getAttackMove(boardState, outcome);
 		}
 		
-		
-		
 		Debug.output("exiting attack phase",1);
 	}
 	
 	public int moveArmiesIn(int invadingCountry, int invadedCountry)
 	{
 		boardState.attackState = AttackState.INVADE;
-		boardState.defendingCountry = invadedCountry;
-		boardState.attackingCountry = invadingCountry;
-		boardState.hasCapturedACountry = true;
+		boardState.defendingCC = invadedCountry;
+		boardState.attackingCC = invadingCountry;
+		boardState.hasInvadedACountry = true;
 
 		AttackOutcome outcome = new AttackOutcome((short)0, lastAttack.defendingArmies, Float.NaN, true);
 		Invasion invasion = (Invasion) tree.getInvasionMove(boardState, outcome);

@@ -1,6 +1,6 @@
 package com.mld46.oponn.moves;
 
-import com.mld46.oponn.sim.boards.SimBoard.Phase;
+import com.mld46.oponn.sim.boards.SimulationBoard.Phase;
 import com.sillysoft.lux.Country;
 
 public abstract class Move

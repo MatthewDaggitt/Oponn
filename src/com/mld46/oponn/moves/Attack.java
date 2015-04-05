@@ -1,14 +1,14 @@
 package com.mld46.oponn.moves;
 
-import com.mld46.oponn.sim.boards.SimBoard.Phase;
+import com.mld46.oponn.sim.boards.SimulationBoard.Phase;
 
 public class Attack extends Move
 {
 	private final String attackerName;
-	public final int attackerCC;
+	public final int attackingCC;
 	public final short attackingArmies;
 	private final String defenderName;
-	public final int defenderCC;
+	public final int defendingCC;
 	public final short defendingArmies;
 	public final boolean attackUntilDead;
 	
@@ -21,8 +21,8 @@ public class Attack extends Move
 			throw new IllegalArgumentException("More than " + Short.MAX_VALUE + " armies on a country - Oponn not equipped to handle this situation!");
 		}
 		
-		this.attackerCC = attackerCC;
-		this.defenderCC = defenderCC;
+		this.attackingCC = attackerCC;
+		this.defendingCC = defenderCC;
 		this.attackingArmies = (short)attackerArmies;
 		this.defendingArmies = (short)defenderArmies;
 		this.attackUntilDead = attackUntilDead;
@@ -37,8 +37,8 @@ public class Attack extends Move
 		if(o instanceof Attack)
 		{
 			Attack a = (Attack)o; 
-			return a.attackerCC == attackerCC &&
-					a.defenderCC == defenderCC &&
+			return a.attackingCC == attackingCC &&
+					a.defendingCC == defendingCC &&
 					a.attackingArmies == attackingArmies &&
 					a.defendingArmies == defendingArmies &&
 					a.attackUntilDead == attackUntilDead;

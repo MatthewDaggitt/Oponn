@@ -12,7 +12,7 @@ import com.mld46.oponn.sim.agents.SimAgent;
 import com.sillysoft.lux.Card;
 import com.sillysoft.lux.Country;
 
-public class ExploratorySimBoard extends SimBoard
+public class ExplorationBoard extends SimulationBoard
 {
 	// Optimisations
 	
@@ -43,24 +43,29 @@ public class ExploratorySimBoard extends SimBoard
 	/** Constructor **/
 	/*****************/
 	
-	public ExploratorySimBoard(Country [] originalCountries, BoardState boardState, SimAgent [] simAgents, CardManager cardManager, int coreID)
+	public ExplorationBoard(	BoardState boardState,
+								SimAgent [] simAgents,
+								CardManager cardManager,
+								int coreID,
+								boolean placementPartialOrderOptimisation,
+								boolean attackAggressiveOptimisation,
+								boolean attackRepeatMovesOptimisation,
+								boolean attackPartialOrderOptimisation,
+								boolean attackUntilDeadOptimisation,
+								boolean invasionOptimisation,
+								boolean fortificationContinentOptimisation)
 	{
-		super(originalCountries, boardState, simAgents, cardManager, coreID);
+		super(boardState, simAgents, cardManager, coreID);
 		
-		/*****************/
-		/** Board state **/
-		/*****************/
-		
-		placementPartialOrderOptimisation = boardState.placementPartialOrderOptimisation;
-		attackAggressiveOptimisation = boardState.attackAggressiveOptimisation;
-		attackRepeatMovesOptimisation = boardState.attackRepeatMovesOptimisation;
-		attackPartialOrderOptimisation = boardState.attackPartialOrderOptimisation;
-		attackUntilDeadOptimisation = boardState.attackUntilDeadOptimisation;
-		invasionOptimisation = boardState.invasionOptimisation;
-		fortificationContinentOptimisation = boardState.fortificationContinentOptimisation;
+		this.placementPartialOrderOptimisation = placementPartialOrderOptimisation;
+		this.attackAggressiveOptimisation = attackAggressiveOptimisation;
+		this.attackRepeatMovesOptimisation = attackRepeatMovesOptimisation;
+		this.attackPartialOrderOptimisation = attackPartialOrderOptimisation;
+		this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
+		this.invasionOptimisation = invasionOptimisation;
+		this.fortificationContinentOptimisation = fortificationContinentOptimisation;
 		
 		attacksMade = new boolean[numberOfCountries][numberOfCountries];
-		
 		fortifiedCountries = new boolean[numberOfCountries];
 	}
 	
@@ -144,16 +149,16 @@ public class ExploratorySimBoard extends SimBoard
 		{
 			Attack a = (Attack) move;
 			
-			if(attackRepeatMovesOptimisation && attackingCountry != null && defendingCountry != null && (attackingCountry.getCode() != a.attackerCC || defendingCountry.getCode() != a.defenderCC))
+			if(attackRepeatMovesOptimisation && attackingCC != -1 && defendingCC != -1 && (attackingCC != a.attackingCC || defendingCC != a.defendingCC))
 			{
 				// If we've switched attacking countries then we may not go back to the previous attack
-				attacksMade[attackingCountry.getCode()][defendingCountry.getCode()] = true;
+				attacksMade[attackingCC][defendingCC] = true;
 			}
 			
-			minAttackSourceCC = a.attackerCC;
-			minAttackDestinationCC = a.defenderCC;
+			minAttackSourceCC = a.attackingCC;
+			minAttackDestinationCC = a.defendingCC;
 			
-			setupAttack(a.attackerCC, a.defenderCC, a.attackUntilDead);
+			setupAttack(a.attackingCC, a.defendingCC, a.attackUntilDead);
 		}
 		else if(move instanceof AttackOutcome)
 		{
@@ -169,6 +174,9 @@ public class ExploratorySimBoard extends SimBoard
 		}
 		else if(move instanceof Invasion)
 		{
+			Country attackingCountry = countries[attackingCC];
+			Country defendingCountry = countries[defendingCC];
+			
 			Invasion i = (Invasion) move;
 			executeInvasion(i.armies);
 			finishInvasion();
@@ -547,8 +555,8 @@ public class ExploratorySimBoard extends SimBoard
 	private List<Move> getAttackExecuteMoves()
 	{
 		List<Move> moves = new ArrayList<Move>();
-		int attackers = attackingCountry.getArmies();
-		int defenders = defendingCountry.getArmies();
+		int attackers = countries[attackingCC].getArmies();
+		int defenders = countries[defendingCC].getArmies();
 		
 		if(attackUntilDeadOptimisation && attackUntilDead)
 		{
@@ -598,6 +606,9 @@ public class ExploratorySimBoard extends SimBoard
 	private List<Move> getAttackInvadeMoves()
 	{
 		List<Move> moves = new ArrayList<Move>();
+		Country attackingCountry = countries[attackingCC];
+		Country defendingCountry = countries[defendingCC];
+		
 		int attackers = attackingCountry.getArmies();
 		boolean onlyLargest = false;
 		
@@ -821,12 +832,57 @@ public class ExploratorySimBoard extends SimBoard
 
 	public int getPositionalHash()
 	{
-		int [] position = new int[numberOfCountries*2];
-		for(int i = 0; i < numberOfCountries; i++)
+		int [] armies = new int[numberOfCountries];
+		int [] moveableArmies = new int[numberOfCountries];
+		int [] owners = new int[numberOfCountries];
+		for(int cc = 0; cc < numberOfCountries; cc++)
 		{
-			position[i] = countries[i].getArmies();
-			position[i + numberOfCountries] = countries[i].getOwner();
+			armies[cc] = countries[cc].getArmies();
+			moveableArmies[cc] = countries[cc].getMoveableArmies();
+			owners[cc] = countries[cc].getOwner();
 		}
-		return Arrays.hashCode(position);
+		
+		int [] cards = new int[numberOfCountries];
+		for(int player = 0; player < numberOfPlayers; player++)
+		{
+			cards[player] = playerCards.get(player).size();
+		}
+		
+		int [] other = new int[]
+		{
+			currentPlayer,
+			numberOfPlaceableArmies,
+			attackingCC,
+			defendingCC
+		};
+
+		return Arrays.deepHashCode(new int[][]{
+			armies,
+			moveableArmies,
+			owners,
+			cards,
+			other
+		});
+	}
+
+	public BoardState getBoardState()
+	{
+		BoardState bs = new BoardState(this, currentPlayer);
+		bs.currentPhase = currentPhase;
+		bs.turnCount = simTurnCount + simStartTurn;
+		bs.cardProgressionPos = 0;
+		bs.playerNumberOfCards = new int[numberOfPlayers];
+		for(int player = 0; player < numberOfPlayers; player++)
+		{
+			bs.playerNumberOfCards[player] = playerCards.get(player).size();
+		}
+		bs.numberOfPlaceableArmies = numberOfPlaceableArmies;
+		bs.hasInvadedACountry = hasInvadedACountry;
+		bs.attackState = attackState;
+		bs.attackingCC = attackingCC;
+		bs.defendingCC = defendingCC;
+		bs.defendingPlayer = defendingPlayer;
+		bs.fortifiedCountries = fortifiedCountries;
+		return bs;
 	}
 }

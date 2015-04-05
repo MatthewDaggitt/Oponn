@@ -4,17 +4,15 @@ import com.mld46.oponn.BoardState;
 import com.mld46.oponn.CardManager;
 import com.mld46.oponn.sim.agents.SimAgent;
 import com.mld46.oponn.sim.agents.SimRandom;
-import com.sillysoft.lux.Country;
 
-public class ModellingSimBoard extends ExploratorySimBoard
+public class ModellingBoard extends SimulationBoard
 {
 	private final SimAgent [] initialSimAgents;
 	private final int modellingTurnLimit;
 	
-	public ModellingSimBoard(Country[] originalCountries,
-			BoardState boardState, SimAgent[] simAgents, CardManager cardManager, int coreID, int modellingTurnLimit)
+	public ModellingBoard(BoardState bs, SimAgent[] sas, CardManager cm, int cid, int modellingTurnLimit)
 	{
-		super(originalCountries, boardState, simAgents, cardManager, coreID);
+		super(bs,sas,cm,cid);
 	
 		this.modellingTurnLimit = modellingTurnLimit;
 		this.initialSimAgents = simAgents;

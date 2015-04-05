@@ -1,6 +1,6 @@
 package com.mld46.oponn.sim.agents;
 
-import com.mld46.oponn.sim.boards.SimBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard;
 import com.sillysoft.lux.*;
 
 //
@@ -32,7 +32,7 @@ public class SimKillbot extends SimVulture
 		super.setPrefs(ID, board);
 	}
 	
-	public void setSimPrefs(int ID, SimBoard simBoard)
+	public void setSimPrefs(int ID, SimulationBoard simBoard)
 	{
 		backer.setSimPrefs(ID, simBoard);
 		super.setSimPrefs(ID, simBoard);

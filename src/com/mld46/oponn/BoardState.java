@@ -1,10 +1,11 @@
 
 package com.mld46.oponn;
 
-import com.mld46.oponn.sim.boards.SimBoard;
-import com.mld46.oponn.sim.boards.SimBoard.AttackState;
-import com.mld46.oponn.sim.boards.SimBoard.Phase;
+import com.mld46.oponn.sim.boards.SimulationBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard.AttackState;
+import com.mld46.oponn.sim.boards.SimulationBoard.Phase;
 import com.sillysoft.lux.Board;
+import com.sillysoft.lux.Country;
 
 public class BoardState
 {
@@ -12,12 +13,11 @@ public class BoardState
 	
 		// Game settings
 	
-		public int numberOfPlayers;
+		public final int numberOfPlayers;
+		public final String [] agentNames;
 		public final int numberOfCountries;
 		public final int numberOfContinents;
 		public final int [] initialContinentBonuses;
-		
-		public String [] agentNames;
 		
 		public final boolean useCards;
 		public final boolean transferCards;
@@ -25,26 +25,18 @@ public class BoardState
 		public final int continentIncrease;
 		public final String cardProgression;
 	
-		// Sim settings
-		
-		public final boolean placementPartialOrderOptimisation;
-		public final boolean attackAggressiveOptimisation;
-		public final boolean attackRepeatMovesOptimisation;
-		public final boolean attackPartialOrderOptimisation;
-		public final boolean attackUntilDeadOptimisation;
-		public final boolean invasionOptimisation;
-		public final boolean fortificationContinentOptimisation;
-		
 	// Mutable state
-		
+
+		public int turnCount;
 		public int currentPlayer;
 		public Phase currentPhase;
-		public int [] playerNumberOfCards;
-		public int turnCount;
+		
+		public Country [] countries;
 		
 		// Card state
 		
 		public int cardProgressionPos = 0;
+		public int [] playerNumberOfCards;
 		
 		// Placement state
 	
@@ -52,28 +44,18 @@ public class BoardState
 		
 		// Attacking state
 	
-		public boolean hasCapturedACountry;
+		public boolean hasInvadedACountry;
 		public AttackState attackState;
-		public int attackingCountry;
-		public int defendingCountry;
+		public int attackingCC;
+		public int defendingCC;
 		public int defendingPlayer;
 		
 		// Fortification phase
 		
 		public boolean [] fortifiedCountries;
 		
-	public BoardState(
-		Board board,
-		int agentID,
-		boolean placementPartialOrderOptimisation,
-		boolean attackAggressiveOptimisation,
-		boolean attackRepeatMovesOptimisation,
-		boolean attackPartialOrderOptimisation,
-		boolean attackUntilDeadOptimisation,
-		boolean invasionOptimisation,
-		boolean fortificationContinentOptimisation)
+	public BoardState(Board board, int currentPlayer)
 	{
-				
 		numberOfPlayers = board.getNumberOfPlayers();
 		numberOfCountries = board.getNumberOfCountries();
 		numberOfContinents = board.getNumberOfContinents();
@@ -95,78 +77,63 @@ public class BoardState
 		continentIncrease = board.getContinentIncrease();
 		cardProgression = board.getCardProgression();
 		
-		currentPlayer = agentID;
+		countries = board.getCountries();
+		fortifiedCountries = new boolean[numberOfCountries];
+		playerNumberOfCards = new int[numberOfPlayers];
 		
+		this.currentPlayer = currentPlayer;
+	}
+	
+	public BoardState(SimulationBoard simBoard, int currentPlayer)
+	{		
+		numberOfPlayers = simBoard.getNumberOfPlayers();
+		numberOfCountries = simBoard.getNumberOfCountries();
+		numberOfContinents = simBoard.getNumberOfContinents();
+		initialContinentBonuses = new int[numberOfContinents];
+		for(int i = 0; i < numberOfContinents; i++)
+		{
+			initialContinentBonuses[i] = simBoard.getContinentBonus(i);
+		}
+		
+		agentNames = new String[numberOfPlayers];
+		for(int i = 0; i < numberOfPlayers; i++)
+		{
+			agentNames[i] = simBoard.getRealAgentName(i);
+		}
+				
+		useCards = simBoard.useCards();
+		transferCards = simBoard.transferCards();
+		immediateCash = simBoard.immediateCash();
+		continentIncrease = simBoard.getContinentIncrease();
+		cardProgression = simBoard.getCardProgression();
+		
+		countries = simBoard.getCountries();
 		playerNumberOfCards = new int[numberOfPlayers];
 		fortifiedCountries = new boolean[numberOfCountries];
 		
-		this.placementPartialOrderOptimisation = placementPartialOrderOptimisation;
-		this.attackAggressiveOptimisation = attackAggressiveOptimisation;
-		this.attackRepeatMovesOptimisation = attackRepeatMovesOptimisation;
-		this.attackPartialOrderOptimisation = attackPartialOrderOptimisation;
-		this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
-		this.invasionOptimisation = invasionOptimisation;
-		this.fortificationContinentOptimisation = fortificationContinentOptimisation;
+		this.currentPlayer = currentPlayer;
 	}
+
 	
-	public BoardState(
-			SimBoard simBoard,
-			int agentID,
-			boolean placementPartialOrderOptimisation,
-			boolean attackAggressiveOptimisation,
-			boolean attackRepeatMovesOptimisation,
-			boolean attackPartialOrderOptimisation,
-			boolean attackUntilDeadOptimisation,
-			boolean invasionOptimisation,
-			boolean fortificationContinentOptimisation)
-		{
-					
-			numberOfPlayers = simBoard.getNumberOfPlayers();
-			numberOfCountries = simBoard.getNumberOfCountries();
-			numberOfContinents = simBoard.getNumberOfContinents();
-			initialContinentBonuses = new int[numberOfContinents];
-			for(int i = 0; i < numberOfContinents; i++)
-			{
-				initialContinentBonuses[i] = simBoard.getContinentBonus(i);
-			}
-			
-			agentNames = new String[numberOfPlayers];
-			for(int i = 0; i < numberOfPlayers; i++)
-			{
-				agentNames[i] = simBoard.getRealAgentName(i);
-			}
-					
-			useCards = simBoard.useCards();
-			transferCards = simBoard.transferCards();
-			immediateCash = simBoard.immediateCash();
-			continentIncrease = simBoard.getContinentIncrease();
-			cardProgression = simBoard.getCardProgression();
-			
-			currentPlayer = agentID;
-			
-			playerNumberOfCards = new int[numberOfPlayers];
-			fortifiedCountries = new boolean[numberOfCountries];
-			
-			this.placementPartialOrderOptimisation = placementPartialOrderOptimisation;
-			this.attackAggressiveOptimisation = attackAggressiveOptimisation;
-			this.attackRepeatMovesOptimisation = attackRepeatMovesOptimisation;
-			this.attackPartialOrderOptimisation = attackPartialOrderOptimisation;
-			this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
-			this.invasionOptimisation = invasionOptimisation;
-			this.fortificationContinentOptimisation = fortificationContinentOptimisation;
-		}
-	
-	public void transferMutableState(BoardState bs)
+	public static Country [] cloneCountries(Country [] originalCountries)
 	{
-		bs.numberOfPlaceableArmies = numberOfPlaceableArmies;
-		bs.hasCapturedACountry = hasCapturedACountry;
-		bs.attackState = attackState;
-		bs.attackingCountry = attackingCountry;
-		bs.defendingCountry = defendingCountry;
-		bs.defendingPlayer = defendingPlayer;
-		bs.playerNumberOfCards = playerNumberOfCards;
-		bs.currentPhase = currentPhase;
-		bs.turnCount = turnCount;
-		bs.currentPlayer = currentPlayer;
+		int numberOfCountries = originalCountries.length;
+				
+		Country [] countries = new Country[numberOfCountries];
+		for(int cc = 0; cc < numberOfCountries; cc++)
+		{
+			Country originalCountry = originalCountries[cc];
+			countries[cc] = new Country(cc,originalCountry.getContinent(),null);
+			countries[cc].setName(originalCountry.getName(), null);
+		}
+		for(int cc = 0; cc < numberOfCountries; cc++)
+		{
+	        for(int nc : originalCountries[cc].getAdjoiningCodeList())
+	        {
+	            countries[cc].addToAdjoiningList(countries[nc], null);
+	        }
+		}
+		
+		return countries;
 	}
 }

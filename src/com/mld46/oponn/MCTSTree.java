@@ -12,10 +12,11 @@ import com.mld46.oponn.moves.AttackOutcome;
 import com.mld46.oponn.moves.CountrySelection;
 import com.mld46.oponn.moves.Move;
 import com.mld46.oponn.moves.NextPhase;
-import com.mld46.oponn.sim.boards.ExploratorySimBoard;
-import com.mld46.oponn.sim.boards.SimBoard.Phase;
+import com.mld46.oponn.sim.boards.ExplorationBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard.Phase;
 
-public class MCSTTree
+public class MCTSTree
 {
 	// Exploration constant
 	private final double C = 1;
@@ -24,19 +25,22 @@ public class MCSTTree
 	// Randomness constant
 	private final double EPSILON = 1e-10;
 	
-	private final int cores;
-	private final int iterations;
-	private final int loops;
-	
+	// Optimisations
 	private final boolean retainRoot;
 	private final boolean restoreTree;
 	private final boolean attackAggressiveOptimisation;
 	private final MoveSelectionPolicy moveSelectionPolicy;
 	
+	private final int cores;
+	private final int iterations;
+	private final int loops;
+	
 	private final int agentID;
 	private final int numberOfPlayers;
 	
-	private final ExploratorySimBoard [] simBoards;
+	private final ExplorationBoard explorationBoard;
+	private final SimulationBoard [] simulationBoards;
+	
 	private SearchNode root;
 	private Random random = new Random();
 	
@@ -44,7 +48,8 @@ public class MCSTTree
 	/** Constructor **/
 	/*****************/
 	
-	public MCSTTree(ExploratorySimBoard [] simBoards,
+	public MCTSTree(ExplorationBoard explorationBoard,
+					SimulationBoard [] simulationBoards,
 					int agentID,
 					int cores,
 					int iterations,
@@ -54,7 +59,7 @@ public class MCSTTree
 					MoveSelectionPolicy moveSelectionPolicy)
 	{
 		this.agentID = agentID;
-		this.numberOfPlayers = simBoards[0].getNumberOfPlayers();
+		this.numberOfPlayers = explorationBoard.getNumberOfPlayers();
 		
 		this.cores = cores;
 		this.iterations = iterations;
@@ -65,7 +70,8 @@ public class MCSTTree
 		this.attackAggressiveOptimisation = attackAggressiveOptimisation;
 		this.moveSelectionPolicy = moveSelectionPolicy;
 		
-		this.simBoards = simBoards;
+		this.explorationBoard = explorationBoard;
+		this.simulationBoards = simulationBoards;
 	}
 	
 	/******************/
@@ -167,7 +173,7 @@ public class MCSTTree
 			
 			// Selection phase
 			path.add(root);
-			simBoards[0].setupState(boardState);
+			explorationBoard.setupState(boardState);
 			while(nextNode != null && simOngoing)
 			{
 				currentNode = nextNode;
@@ -175,14 +181,14 @@ public class MCSTTree
 				
 				if(nextNode != null)
 				{
-					simOngoing = simBoards[0].updateState(nextNode.move);
+					simOngoing = explorationBoard.updateState(nextNode.move);
 				}
 			}
 			
 			if(simOngoing)
 			{
-				expansion(currentNode, simBoards[0].getPossibleMoves());
-				simulation(boardState, path);
+				expansion(currentNode, explorationBoard.getPossibleMoves());
+				simulation(explorationBoard.getBoardState());
 			}
 			
 			backpropagation(path);
@@ -335,7 +341,7 @@ public class MCSTTree
 	
 	// Simulation
 	
-	private void simulation(final BoardState boardState, final List<SearchNode> path)
+	private void simulation(final BoardState boardState)
 	{
 		class Simulation extends Thread
 		{
@@ -348,12 +354,8 @@ public class MCSTTree
 			@Override
 			public void run()
 			{
-				simBoards[id].setupState(boardState);
-				for(int i = 1; i < path.size(); i++)
-				{
-					simBoards[id].updateState(path.get(i).move);
-				}
-				simBoards[id].simulate();
+				simulationBoards[id].setupState(boardState);
+				simulationBoards[id].simulate();
 			}
 		}
 	
@@ -389,8 +391,8 @@ public class MCSTTree
 		
 		for(int j = 0; j < cores; j++)
 		{
-			int [] playerOutOnTurn = simBoards[j].getPlayerOutOnTurn();
-			int finalTurn = simBoards[j].getSimTurnCount();
+			int [] playerOutOnTurn = simulationBoards[j].getPlayerOutOnTurn();
+			int finalTurn = simulationBoards[j].getSimTurnCount();
 			
 			for(SearchNode node : path)
 			{
@@ -575,9 +577,9 @@ public class MCSTTree
 	
 	private void restoreTree(BoardState boardState)
 	{
-		simBoards[0].setupState(boardState);
+		explorationBoard.setupState(boardState);
 		
-		List<Move> moves = simBoards[0].getPossibleMoves();
+		List<Move> moves = explorationBoard.getPossibleMoves();
 		List<SearchNode> children = root.children;
 		
 		int childIndex = 0;

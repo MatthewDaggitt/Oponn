@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.mld46.oponn.Debug;
 import com.mld46.oponn.MapStats;
-import com.mld46.oponn.sim.boards.SimBoard;
+import com.mld46.oponn.sim.boards.SimulationBoard;
 import com.sillysoft.lux.Board;
 import com.sillysoft.lux.Card;
 import com.sillysoft.lux.Country;
@@ -14,7 +14,7 @@ public abstract class SimAgent implements LuxAgent
 {
 	private boolean simulating;
 	private Board board;
-	private SimBoard simBoard;
+	private SimulationBoard simBoard;
 	
 	protected int ID;
 	protected Country [] countries;
@@ -39,12 +39,12 @@ public abstract class SimAgent implements LuxAgent
 		setBoard(board, null);
 	}
 	
-	public void setSimPrefs(int ID, SimBoard simBoard) {
+	public void setSimPrefs(int ID, SimulationBoard simBoard) {
 		this.ID = ID;
 		setBoard(null, simBoard);
 	}
 	
-	private void setBoard(Board board, SimBoard simBoard)
+	private void setBoard(Board board, SimulationBoard simBoard)
 	{
 		this.board = board;
 		this.simBoard = simBoard;
