@@ -4,6 +4,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 import com.mld46.oponn.Oponn.MoveSelectionPolicy;
 import com.mld46.oponn.moves.Attack;
@@ -37,6 +38,7 @@ public class MCSTTree
 	
 	private final ExploratorySimBoard [] simBoards;
 	private SearchNode root;
+	private Random random = new Random();
 	
 	/*****************/
 	/** Constructor **/
@@ -206,12 +208,11 @@ public class MCSTTree
 	private SearchNode stochasticSelection(SearchNode node)
 	{
 		// Choose move according to the probability distribution of outcomes
-		double currentScore;
 		double bestScore = Integer.MIN_VALUE;
 		SearchNode bestChild = null;
 		for(SearchNode child : node.children)
 		{
-			currentScore = ((AttackOutcome)child.move).probability;
+			double currentScore = ((AttackOutcome)child.move).probability;
 			if(node.visits != 0)
 			{
 				 currentScore -= child.visits/(double)node.visits;
@@ -228,6 +229,11 @@ public class MCSTTree
 	
 	private SearchNode deterministicSelection(SearchNode node)
 	{
+		if(!node.unvisitedChildren.isEmpty())
+		{
+			return node.unvisitedChildren.get(random.nextInt(node.unvisitedChildren.size()));
+		}
+		
 		double logVisits = Math.log(node.visits+1);
 		double maxAverageWinLength = Double.NEGATIVE_INFINITY;
 		double minAverageWinLength = Double.POSITIVE_INFINITY;
@@ -269,12 +275,6 @@ public class MCSTTree
 		// Find the highest scoring child
 		for(SearchNode child : node.children)
 		{
-			if(child.visits == 0)
-			{
-				// Then its never been visited before and hence prioritise it
-				return child;
-			}
-			
 			double winPercentage = child.wins[child.currentPlayer]/(double)child.visits;
 			double winScore = (1-a)*winPercentage;
 			
@@ -377,10 +377,16 @@ public class MCSTTree
 		}
 	}
 	
-	// Backpropagation
+	// Back-propagation
 	
 	private void backpropagation(List<SearchNode> path)
 	{
+		int pathLength = path.size();
+		if(pathLength > 1)
+		{
+			path.get(pathLength-2).unvisitedChildren.remove(path.get(pathLength-1));
+		}
+		
 		for(int j = 0; j < cores; j++)
 		{
 			int [] playerOutOnTurn = simBoards[j].getPlayerOutOnTurn();
@@ -401,6 +407,7 @@ public class MCSTTree
 						node.losses[i]++;
 					}
 				}
+				
 				node.visits++;
 			}
 		}
