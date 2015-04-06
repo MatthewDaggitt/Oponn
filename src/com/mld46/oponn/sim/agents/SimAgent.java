@@ -87,8 +87,6 @@ public abstract class SimAgent implements LuxAgent
 			throw new IllegalArgumentException("SimAgent cannot be both playing for real and simulating");
 		}
 		
-
-		MapStats.initialise(countries, numberOfContinents);
 		mapHelper = new MapHelper(this);
 	}
 	

@@ -80,6 +80,8 @@ public class Oponn extends SimAgent
 		super.setPrefs(newID, board);
 		
 		readSettings();
+
+		MapStats.initialise(countries, numberOfContinents);
 		
 		boardState = new BoardState(board,ID);
 		

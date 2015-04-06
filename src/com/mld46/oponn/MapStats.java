@@ -27,18 +27,13 @@ public class MapStats
 	
 	public static void initialise(Country [] countries, int numberOfContinents)
 	{
-		if(!initialised)
-		{
-			MapStats.numberOfCountries = countries.length;
-			MapStats.numberOfContinents = numberOfContinents;
-			
-			initialiseContinentLists(countries);
-			initialiseNodes(countries);
-			initialiseCompulsoryReinforcementMoves(countries);
-			initialiseValidReinforcementMoves(countries);
-			
-			initialised = true;
-		}
+		MapStats.numberOfCountries = countries.length;
+		MapStats.numberOfContinents = numberOfContinents;
+		
+		initialiseContinentLists(countries);
+		initialiseNodes(countries);
+		initialiseCompulsoryReinforcementMoves(countries);
+		initialiseValidReinforcementMoves(countries);
 	}
 	
 	private static void initialiseContinentLists(Country [] countries)
@@ -72,7 +67,10 @@ public class MapStats
 			{
 				if(cContinent != n.getContinent())
 				{
-					continentInternalBorders.get(cContinent).add(cc);
+					if(!continentInternalBorders.get(cContinent).contains(cc))
+					{
+						continentInternalBorders.get(cContinent).add(cc);
+					}
 					
 					nc = n.getCode();
 					if(!continentExternalBorders.get(cContinent).contains(nc))
@@ -100,7 +98,6 @@ public class MapStats
 		boolean [] visited = new boolean[countries.length];
 		
 		nodes = new SearchNode[countries.length];
-		
 		for(int i = 0; i < numberOfCountries; i++)
 		{
 			nodes[i] = new SearchNode(countries[i]);
@@ -108,6 +105,10 @@ public class MapStats
 		
 		for(int continent = 0; continent < numberOfContinents; continent++)
 		{
+			if(continent == 9)
+			{
+				System.out.println("hmm");
+			}
 			borderCodes = continentInternalBorders.get(continent);
 			
 			for(int border : borderCodes)
@@ -151,7 +152,6 @@ public class MapStats
 				nodes[c].nextBorder();
 			}
 		}
-		
 		/**
 		for(int cont = 0; cont < numberOfContinents; cont++)
 		{
@@ -195,6 +195,10 @@ public class MapStats
 		
 		for(int cc = 0; cc < numberOfCountries; cc++)
 		{
+			if(cc == 181)
+			{
+				System.out.println(cc);
+			}
 			c = countries[cc];
 			continent = c.getContinent();
 			csn = nodes[cc];
@@ -283,7 +287,13 @@ public class MapStats
 							
 							for(int border = 0; border < s1.costsToBorder.size(); border++)
 							{
-								closer &= s1.costsToBorder.get(border) <= s2.costsToBorder.get(border);
+								Integer cost1 = s1.costsToBorder.get(border);
+								Integer cost2 = s2.costsToBorder.get(border);
+								
+								if(cost1 != null && cost2 != null)
+								{
+									closer &= s1.costsToBorder.get(border) <= s2.costsToBorder.get(border);
+								}
 							}
 							validReinforcementMoves[cc1][cc2] = !closer;
 						}
@@ -317,10 +327,6 @@ public class MapStats
 	
 	public static List<Integer> getContinentCountries(int continent)
 	{
-		if(continent > continentCountries.size())
-		{
-			System.out.println("Hmm");
-		}
 		return new ArrayList<Integer>(continentCountries.get(continent));
 	}
 	
@@ -379,23 +385,22 @@ public class MapStats
 			boolean closer = true, equal = true;
 			for(int border = 0; border < numberOfBorders; border++)
 			{
-				closer &= costsToBorder.get(border) <= o.costsToBorder.get(border);
-				equal &= costsToBorder.get(border) == o.costsToBorder.get(border);
+				Integer c1 = costsToBorder.get(border);
+				Integer c2 = o.costsToBorder.get(border);
+				
+				if(c1 != null && c2 != null)
+				{
+					closer &= c1 <= c2;
+					equal &= c1 == c2;
+				}
 			}
 			return (strictly && closer && !equal) || (!strictly && closer);
 		}
 		
 		public void nextBorder()
 		{
-			if(currentCost != Integer.MAX_VALUE)
-			{
-				costsToBorder.add(currentCost);
-				numberOfBorders++;
-			}
-			else
-			{
-				numberOfBorders = 0;
-			}
+			costsToBorder.add(currentCost == Integer.MAX_VALUE ? null : currentCost);
+			numberOfBorders++;
 			currentCost = Integer.MAX_VALUE;
 		}
 	}

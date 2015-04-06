@@ -705,71 +705,6 @@ public class ExplorationBoard extends SimulationBoard
 		return moves;
 	}
 	
-	/**
-	private void getCompulsoryInternalContinentFortifications(List<Move> moves, int continent)
-	{
-		Country sourceCountry;
-		int sourceCC;
-		int moveableArmies;
-		
-		List<Entry<Integer,List<Integer>>> compulsoryMoves;
-		List<Integer> destinationCCs;
-		List<Integer> validDestinationCCs;
-		Entry<Integer,List<Integer>> moveSet;
-		
-		int compulsoryMovesSize;
-		
-		compulsoryMoves = MapStats.getCompulsoryFortifications(continent);
-		compulsoryMovesSize = compulsoryMoves.size();
-		
-		for(int i = 0; i < compulsoryMovesSize; i++)
-		{
-			moveSet = compulsoryMoves.get(i);
-			sourceCC = moveSet.getKey();
-			sourceCountry = countries[sourceCC];
-			moveableArmies = Math.min(sourceCountry.getMoveableArmies(),sourceCountry.getArmies()-1);
-			
-			if(moveableArmies > 0)
-			{
-				destinationCCs = moveSet.getValue();
-				
-				if(fortificationRepeatMovesOptimisation)
-				{
-					validDestinationCCs = new ArrayList<Integer>();
-					for(int destinationCC : destinationCCs)
-					{
-						if(!fortificationsMade[sourceCC][destinationCC])
-						{
-							validDestinationCCs.add(destinationCC);
-						}
-					}
-				}
-				else
-				{
-					validDestinationCCs = destinationCCs;
-				}
-				
-				if(validDestinationCCs.size() == 1)
-				{
-					moves.add(new Fortification(moveableArmies,sourceCC,validDestinationCCs.get(0),true));
-				}
-				else
-				{
-					for(int destinationCC : validDestinationCCs)
-					{
-						for(int armies = 1; armies <= moveableArmies; armies++)
-						{
-							moves.add(new Fortification(armies,sourceCC,destinationCC,true));
-						}
-					}
-				}
-				
-				return;
-			}
-		}
-	}
-	**/
-	
 	/****************/
 	/** Simulation **/
 	/****************/
@@ -916,11 +851,6 @@ class FortificationAnalysis
 		if(!analysis.containsKey(positionHash))
 		{
 			analysis.put(positionHash, calculateWeights(playerID, countries));
-			System.out.println("Analysis miss!");
-		}
-		else
-		{
-			System.out.println("Analysis hit!");
 		}
 		return analysis.get(positionHash);
 	}
