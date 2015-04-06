@@ -2,7 +2,10 @@ package com.mld46.oponn.sim.boards;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Queue;
+import java.util.Stack;
 
 import com.mld46.oponn.BattleSim;
 import com.mld46.oponn.BoardState;
@@ -22,7 +25,7 @@ public class ExplorationBoard extends SimulationBoard
 	private final boolean attackPartialOrderOptimisation;
 	private final boolean attackUntilDeadOptimisation;
 	private final boolean invasionOptimisation;
-	private final boolean fortificationContinentOptimisation;
+	private final boolean fortificationOutwardsOptimisation;
 	
 	// Partial order variables
 	
@@ -38,7 +41,8 @@ public class ExplorationBoard extends SimulationBoard
 	// Other
 	
 	private boolean [] fortifiedCountries;
-
+	private FortificationAnalysis fa = new FortificationAnalysis();
+	
 	/*****************/
 	/** Constructor **/
 	/*****************/
@@ -53,7 +57,7 @@ public class ExplorationBoard extends SimulationBoard
 								boolean attackPartialOrderOptimisation,
 								boolean attackUntilDeadOptimisation,
 								boolean invasionOptimisation,
-								boolean fortificationContinentOptimisation)
+								boolean fortificationOutwardsOptimisation)
 	{
 		super(boardState, simAgents, cardManager, coreID);
 		
@@ -63,7 +67,7 @@ public class ExplorationBoard extends SimulationBoard
 		this.attackPartialOrderOptimisation = attackPartialOrderOptimisation;
 		this.attackUntilDeadOptimisation = attackUntilDeadOptimisation;
 		this.invasionOptimisation = invasionOptimisation;
-		this.fortificationContinentOptimisation = fortificationContinentOptimisation;
+		this.fortificationOutwardsOptimisation = fortificationOutwardsOptimisation;
 		
 		attacksMade = new boolean[numberOfCountries][numberOfCountries];
 		fortifiedCountries = new boolean[numberOfCountries];
@@ -676,15 +680,24 @@ public class ExplorationBoard extends SimulationBoard
 		}
 		else
 		{
+			int [] countryWeights = null;
+			if(fortificationOutwardsOptimisation)
+			{
+				countryWeights = fa.getWeights(currentPlayer, countries);
+			}
+			
 			Country country = countries[cc];
 			int moveableArmies = Math.min(country.getMoveableArmies(), country.getArmies()-1);
 			int [] armyIndices = sparseIndices(moveableArmies);
 			
 			for(int nc : country.getFriendlyAdjoiningCodeList())
 			{
-				for(int armies : armyIndices)
+				if(!fortificationOutwardsOptimisation || countryWeights[nc] <= countryWeights[cc])
 				{
-					moves.add(new Fortification(armies, cc, nc, false));
+					for(int armies : armyIndices)
+					{
+						moves.add(new Fortification(armies, cc, nc, false));
+					}
 				}
 			}
 			moves.add(new Fortification(-1, cc, -1, false));
@@ -884,5 +897,88 @@ public class ExplorationBoard extends SimulationBoard
 		bs.defendingPlayer = defendingPlayer;
 		bs.fortifiedCountries = fortifiedCountries;
 		return bs;
+	}
+}
+
+class FortificationAnalysis
+{
+	private HashMap<Integer, int []> analysis = new HashMap<Integer, int[]>();
+	
+	public int [] getWeights(int playerID, Country [] countries)
+	{
+		boolean [] owners = new boolean[countries.length];
+		for(Country country : countries)
+		{
+			owners[country.getCode()] = country.getOwner() == playerID;
+		}
+		int positionHash = Arrays.hashCode(owners);
+		
+		if(!analysis.containsKey(positionHash))
+		{
+			analysis.put(positionHash, calculateWeights(playerID, countries));
+			System.out.println("Analysis miss!");
+		}
+		else
+		{
+			System.out.println("Analysis hit!");
+		}
+		return analysis.get(positionHash);
+	}
+	
+	private int [] calculateWeights(int playerID, Country [] countries)
+	{
+		int numberOfCountries = countries.length;
+		Node [] nodes = new Node[numberOfCountries]; 
+		
+		List<Country> currentCountries = new ArrayList<Country>();
+		for(Country country : countries)
+		{
+			if(country.getOwner() == playerID && country.getNumberEnemyNeighbors() != 0)
+			{
+				currentCountries.add(country);
+				nodes[country.getCode()] = new Node(country,0);
+			}
+		}
+		
+		while(!currentCountries.isEmpty())
+		{
+			List<Country> nextCountries = new ArrayList<Country>();
+			for(Country country : currentCountries)
+			{
+				for(Country neighbour : country.getAdjoiningList())
+				{
+					if(neighbour.getOwner() == playerID && nodes[neighbour.getCode()] == null)
+					{
+						nodes[neighbour.getCode()] = new Node(neighbour, nodes[country.getCode()].value+1);
+						nextCountries.add(neighbour);
+					}
+				}
+			}
+			currentCountries = nextCountries;
+		}
+		
+		int [] weights = new int[numberOfCountries];
+		for(int cc = 0; cc < numberOfCountries; cc++)
+		{
+			weights[cc] = nodes[cc] == null ? -1 : nodes[cc].value;
+		}
+		return weights;
+	}
+
+	public void clear()
+	{
+		analysis.clear();
+	}
+}
+
+class Node
+{
+	public final Country country;
+	public final int value;
+	
+	public Node(Country country, int value)
+	{
+		this.country = country;
+		this.value = value;
 	}
 }

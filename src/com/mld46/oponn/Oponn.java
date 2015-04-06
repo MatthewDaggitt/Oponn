@@ -40,8 +40,8 @@ public class Oponn extends SimAgent
 		SECURE_CHILD
 	}
 	
-	private final boolean RETAIN_ROOT = true;
-	private final boolean RESTORE_TREE = RETAIN_ROOT && true;
+	private final boolean RETAIN_ROOT = false;
+	private final boolean RESTORE_TREE = RETAIN_ROOT && false;
 	
 	private final boolean PLACEMENT_PARTIAL_ORDER_OPTIMISATION = true; 
 	private final boolean ATTACK_AGGRESSIVE_OPTIMISATION = true; 
@@ -49,7 +49,7 @@ public class Oponn extends SimAgent
 	private final boolean ATTACK_PARTIAL_ORDER_OPTIMISATION = false;
 	private final boolean ATTACK_UNTIL_DEAD_OPTIMISATION = true;
 	private final boolean INVASION_OPTIMISATION = true;
-	private final boolean FORTIFICATION_CONTINENT_OPTIMISATION = true;
+	private final boolean FORTIFICATION_OUTWARDS_OPTIMISATION = true;
 	
 	private boolean OPPONENT_MODELLING;
 	private final int MODELLING_TURN_LIMIT = 2;
@@ -118,7 +118,7 @@ public class Oponn extends SimAgent
 			ATTACK_PARTIAL_ORDER_OPTIMISATION,
 			ATTACK_UNTIL_DEAD_OPTIMISATION,
 			INVASION_OPTIMISATION,
-			FORTIFICATION_CONTINENT_OPTIMISATION
+			FORTIFICATION_OUTWARDS_OPTIMISATION
 		);
 		
 		playersEliminated = new boolean [numberOfPlayers];
@@ -175,7 +175,7 @@ public class Oponn extends SimAgent
 			boardState.playerNumberOfCards[i] = 0;
 		}
 		
-		int [] selections;
+		int [] selections = null;
 		if(RETAIN_ROOT)
 		{
 			selections = new int[numberOfPlayers];

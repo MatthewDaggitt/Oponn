@@ -317,6 +317,10 @@ public class MapStats
 	
 	public static List<Integer> getContinentCountries(int continent)
 	{
+		if(continent > continentCountries.size())
+		{
+			System.out.println("Hmm");
+		}
 		return new ArrayList<Integer>(continentCountries.get(continent));
 	}
 	

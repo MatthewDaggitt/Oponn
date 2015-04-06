@@ -3,6 +3,7 @@ package com.mld46.oponn;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -29,6 +30,7 @@ public class MCTSTree
 	private final boolean retainRoot;
 	private final boolean restoreTree;
 	private final boolean attackAggressiveOptimisation;
+	private final boolean useTranspositions;
 	private final MoveSelectionPolicy moveSelectionPolicy;
 	
 	private final int cores;
@@ -43,6 +45,7 @@ public class MCTSTree
 	
 	private SearchNode root;
 	private Random random = new Random();
+	private HashMap<Integer,SearchNode> transpositionTable;
 	
 	/*****************/
 	/** Constructor **/
@@ -68,10 +71,16 @@ public class MCTSTree
 		this.retainRoot = retainRoot;
 		this.restoreTree = restoreTree;
 		this.attackAggressiveOptimisation = attackAggressiveOptimisation;
+		this.useTranspositions = true;
 		this.moveSelectionPolicy = moveSelectionPolicy;
 		
 		this.explorationBoard = explorationBoard;
 		this.simulationBoards = simulationBoards;
+		
+		if(useTranspositions)
+		{
+			transpositionTable = new HashMap<Integer,SearchNode>();
+		}
 	}
 	
 	/******************/
@@ -152,6 +161,9 @@ public class MCTSTree
 		Debug.output("Simulating " + iterations + " times",2);
 		
 		root = new SearchNode(agentID, numberOfPlayers);
+		explorationBoard.setupState(boardState);
+		root.unvisitedChildren.addAll(explorationBoard.getPossibleMoves());
+		
 		/**
 		root = null;
 		if(!retainRoot || root == null)
@@ -164,7 +176,7 @@ public class MCTSTree
 		}
 		**/
 		
-		for(int i = 0; i < loops && root.children.size() != 1; i++)
+		for(int i = 0; i < loops && !(root.children.size() == 1 && root.unvisitedChildren.size() == 0); i++)
 		{
 			SearchNode currentNode = null;
 			SearchNode nextNode = root;
@@ -187,7 +199,7 @@ public class MCTSTree
 			
 			if(simOngoing)
 			{
-				expansion(currentNode, explorationBoard.getPossibleMoves());
+				expansion(path);
 				simulation(explorationBoard.getBoardState());
 			}
 			
@@ -201,7 +213,7 @@ public class MCTSTree
 	
 	private SearchNode selection(SearchNode node, List<SearchNode> path)
 	{
-		if(node.children.isEmpty())
+		if(!node.unvisitedChildren.isEmpty())
 		{
 			return null;
 		}
@@ -235,11 +247,6 @@ public class MCTSTree
 	
 	private SearchNode deterministicSelection(SearchNode node)
 	{
-		if(!node.unvisitedChildren.isEmpty())
-		{
-			return node.unvisitedChildren.get(random.nextInt(node.unvisitedChildren.size()));
-		}
-		
 		double logVisits = Math.log(node.visits+1);
 		double maxAverageWinLength = Double.NEGATIVE_INFINITY;
 		double minAverageWinLength = Double.POSITIVE_INFINITY;
@@ -325,18 +332,26 @@ public class MCTSTree
 	
 	// Expansion 
 	
-	private void expansion(SearchNode node, List<Move> nextMoves)
+	private void expansion(List<SearchNode> path)
 	{
-		if(nextMoves.isEmpty())
+		SearchNode expandingNode = path.get(path.size()-1);
+		
+		Move move = expandingNode.unvisitedChildren.get(random.nextInt(expandingNode.unvisitedChildren.size()));
+		SearchNode newNode = new SearchNode(expandingNode, move, false);
+		
+		expandingNode.children.add(newNode);
+		expandingNode.unvisitedChildren.remove(move);
+		
+		explorationBoard.updateState(move);
+		
+		List<Move> newMoves = explorationBoard.getPossibleMoves();
+		if(newMoves.isEmpty())
 		{
 			throw new IllegalArgumentException("Cannot expand a node with no moves");
 		}
+		newNode.unvisitedChildren.addAll(newMoves);
 		
-		for(Move move : nextMoves)
-		{
-			node.unvisitedChildren.add(new SearchNode(node, move, false));
-		}
-		node.children.addAll(node.unvisitedChildren);
+		path.add(newNode);
 	}
 	
 	// Simulation
@@ -545,6 +560,10 @@ public class MCTSTree
 			}
 		}
 		
+		if(bestMoves.size() == 0)
+		{
+			System.out.println("Hmm");
+		}
 		return bestMoves.get((int)(Math.random()*bestMoves.size()));
 	}
 	
@@ -614,7 +633,7 @@ class SearchNode implements Comparable<SearchNode>
 	public double [] averageLossLength;
 	
 	public List<SearchNode> children = new ArrayList<SearchNode>();
-	public List<SearchNode> unvisitedChildren = new ArrayList<SearchNode>();
+	public List<Move> unvisitedChildren = new ArrayList<Move>();
 	
 	public SearchNode(int currentPlayer, int numberOfPlayers)
 	{

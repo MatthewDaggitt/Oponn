@@ -175,6 +175,11 @@ public class SimCluster extends SimSmartAgentBase
 		{
 			// Center the cluster on the biggest continent we own
 			int ownCont = getMostValuablePositiveOwnedCont();
+			if(ownCont == -1)
+			{
+				System.out.println("Hmm");
+			}
+			
 			placeArmiesOnClusterBorder(numberOfArmies,
 					countries[BoardHelper.getCountryInContinent(ownCont,
 							countries)]);

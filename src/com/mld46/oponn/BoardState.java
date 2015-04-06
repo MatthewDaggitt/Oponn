@@ -126,6 +126,7 @@ public class BoardState
 			countries[cc] = new Country(cc,originalCountry.getContinent(),null);
 			countries[cc].setName(originalCountry.getName(), null);
 		}
+		
 		for(int cc = 0; cc < numberOfCountries; cc++)
 		{
 	        for(int nc : originalCountries[cc].getAdjoiningCodeList())
