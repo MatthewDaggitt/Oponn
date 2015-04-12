@@ -71,7 +71,6 @@ public class CardManager
 			simDecks.add(null);
 			simCardProgressionPositions[i] = 1;
 		}
-		
 	}
 	
 	public void updateCardsHeld(Card [] realCards)
@@ -111,91 +110,105 @@ public class CardManager
 	
 	public void updateCardProgressionPosition(int nextValue, int [] newCardNumbers, boolean [] playersEliminatedLastTurn)
 	{
-		if(cardProgression.equals("0"))
+		switch(cardProgression)
 		{
-			cardProgressionPos = 1;
-		}
-		else if(cardProgression.equals("4, 5, 6..."))
-		{
-			cardProgressionPos = nextValue-3;
-		}
-		else if(cardProgression.equals("4, 6, 8..."))
-		{
-			cardProgressionPos = nextValue/2 - 1;
-		}
-		else if(cardProgression.equals("3, 6, 9..."))
-		{
-			cardProgressionPos = nextValue/3;
-		}
-		else if(cardProgression.equals("4, 6, 8, 10, 15, 20..."))
-		{
-			cardProgressionPos = nextValue <= 10 ? nextValue/2 - 1 : nextValue/5 + 2;
-		}
-		else if(cardProgression.equals("5, 10, 15..."))
-		{
-			cardProgressionPos = nextValue/5;
-		}
-		else if(cardProgression.equals("4, 6, 8, 10, 15, 20, 25, 10, 10, 10..."))
-		{
-			if(nextValue < 10)
-			{
+			case "0": 	
+				cardProgressionPos = 1;
+				break;
+			case "5, 5, 5...":
+				cardProgressionPos = 1;
+				break;
+			case "4, 5, 6...":
+				cardProgressionPos = nextValue-3;
+				break;
+			case "4, 6, 8...":
 				cardProgressionPos = nextValue/2 - 1;
-			}
-			else if(nextValue > 10)
-			{
-				cardProgressionPos = nextValue/5 + 2;
-			}
-			else
-			{
-				cardProgressionPos = cardProgressionPos <= 4 ? 4 : 8;
-			}
-		}
-		else
-		{
-			int estimatedCardsCashed = 0;
-			int floatingTransferCards = 0;
-			for(int i = 0; i < numberOfPlayers; i++)
-			{
-				if(i != agentID)
+				break;
+			case "3, 6, 9...":
+				cardProgressionPos = nextValue/3;
+				break;
+			case "4, 6, 8, 10, 15, 20...":
+				cardProgressionPos = nextValue <= 10 ? nextValue/2 - 1 : nextValue/5 + 2;
+				break;
+			case "5, 10, 15...":
+				cardProgressionPos = nextValue/5;
+				break;
+				
+			case "4, 6, 8, 10, 15, 20, 25, 10, 10, 10...":
+				if(nextValue < 10)
 				{
-					if(playersEliminatedLastTurn[i])
+					cardProgressionPos = nextValue/2 - 1;
+				}
+				else if(nextValue > 10)
+				{
+					cardProgressionPos = nextValue/5 + 2;
+				}
+				else
+				{
+					cardProgressionPos = cardProgressionPos <= 4 ? 4 : 8;
+				}
+				break;
+				
+			case "4, 4, 6, 6, 6, 8, 8, 8, 8, 10...":
+				int estimatedCardsCashed = 0;
+				int floatingTransferCards = 0;
+				for(int i = 0; i < numberOfPlayers; i++)
+				{
+					if(i != agentID)
 					{
-						if(transferCards)
+						if(playersEliminatedLastTurn[i])
 						{
-							floatingTransferCards += previousCardNumbers[i];
+							if(transferCards)
+							{
+								floatingTransferCards += previousCardNumbers[i];
+							}
 						}
-					}
-					else
-					{
-						if(newCardNumbers[i] > previousCardNumbers[i] + 1)
+						else
 						{
-							floatingTransferCards -= newCardNumbers[i] - previousCardNumbers[i] - 1;
-						}
-						else if(newCardNumbers[i] < previousCardNumbers[i])
-						{
-							estimatedCardsCashed += previousCardNumbers[i] - newCardNumbers[i] - 1;
+							if(newCardNumbers[i] > previousCardNumbers[i] + 1)
+							{
+								floatingTransferCards -= newCardNumbers[i] - previousCardNumbers[i] - 1;
+							}
+							else if(newCardNumbers[i] < previousCardNumbers[i])
+							{
+								estimatedCardsCashed += previousCardNumbers[i] - newCardNumbers[i] - 1;
+							}
 						}
 					}
 				}
-			}
-			int estimatedCashes = (estimatedCardsCashed + floatingTransferCards)/3;
-			
-			if(cardProgression.equals("5, 5, 5..."))
-			{
-				cardProgressionPos += estimatedCashes;
-			}
-			else if(cardProgression.equals("4, 4, 6, 6, 6, 8, 8, 8, 8, 10..."))
-			{
+				int estimatedCashes = (estimatedCardsCashed + floatingTransferCards)/3;
+				
 				int tri = (nextValue-2)/2;
 				cardProgressionPos = Math.max(cardProgressionPos,tri*(tri+1)/2) + estimatedCashes;
-			}
-			else
-			{
-				throw new IllegalArgumentException("Unrecognised card progression: " + cardProgression);
-			}
+				break;
+				
+			default:
+				boolean valid = false;
+				if(cardProgression.contains("%"))
+				{
+					int pos = 1;
+					int value = getCardCashValue(pos); 
+					while(value < nextValue)
+					{
+						pos++;
+						value = getCardCashValue(pos);
+					}
+
+					if(value == nextValue)
+					{
+						cardProgressionPos = pos;
+						valid = true;
+					}
+				}
+				
+				if(!valid)
+				{
+					throw new IllegalArgumentException("Unrecognised card progression: " + cardProgression);
+				}
 		}
 		previousCardNumbers = newCardNumbers;
 	}
+
 	
 	public List<Card> getCardsHeld()
 	{
@@ -269,29 +282,61 @@ public class CardManager
 	
 	private int getCardCashValue(int pos)
 	{
-		switch(cardProgression)
+		String cp = cardProgression;
+		
+		try
 		{
-			case "0":
-				return 0;
-			case "5, 5, 5...": 
-				return 5;
-			case "4, 4, 6, 6, 6, 8, 8, 8, 8, 10...":
-				return (int) (Math.ceil((Math.sqrt(8*pos+9)-1)/2)*2);
-			case "4, 5, 6...":
-				return pos+3;
-			case "4, 6, 8...":
-				return (pos+1)*2;
-			case "3, 6, 9...":
-				return pos*3;
-			case "4, 6, 8, 10, 15, 20...":
-				return pos <= 4 ? (pos+1)*2 : (pos-2)*5;
-			case "5, 10, 15...":
-				return pos*5;
-			case "4, 6, 8, 10, 15, 20, 25, 10, 10, 10...":
-				return pos <= 4 ? (pos+1)*2 : (pos <= 7 ? (pos-2)*5 : 10);
-			default:
-				System.out.println("Unrecognised card progression: " + cardProgression);
-				throw new IllegalArgumentException();
+			if(cp.contains("%"))
+			{
+				// Exponential cards
+				int base, offset;
+				if(cp.charAt(0) == '5')
+				{
+					base = 5*pos;
+					offset = 6;
+				}
+				else
+				{
+					base = pos <= 4 ? 2*(pos+1) : 5*(pos-2);
+					offset = 8;
+				}
+				
+				double exp = 1 + (Integer.valueOf(cp.substring(cp.indexOf('^')+1,cp.length()-1))/100.0);
+				return (int) Math.floor(base <= 25 ? base : base*Math.pow(exp, pos-offset));
+			}
+			else
+			{
+				// Non-exponential cards
+				switch(cp)
+				{
+					case "0":
+						return 0;
+					case "5, 5, 5...": 
+						return 5;
+					case "4, 4, 6, 6, 6, 8, 8, 8, 8, 10...":
+						return (int) (Math.ceil((Math.sqrt(8*pos+9)-1)/2)*2);
+					case "4, 5, 6...":
+						return pos+3;
+					case "4, 6, 8...":
+						return (pos+1)*2;
+					case "3, 6, 9...":
+						return pos*3;
+					case "4, 6, 8, 10, 15, 20...":
+						return pos <= 4 ? (pos+1)*2 : (pos-2)*5;
+					case "5, 10, 15...":
+						return pos*5;
+					case "4, 6, 8, 10, 15, 20, 25, 10, 10, 10...":
+						return pos <= 4 ? (pos+1)*2 : (pos <= 7 ? (pos-2)*5 : 10);
+					default:
+						throw new Exception();
+				}
+			}
+		}
+		catch(Exception e)
+		{
+			//throw new IllegalArgumentException("Unrecognised card progression: " + cardProgression);
+			e.printStackTrace();
+			return 2;
 		}
 	}
 	

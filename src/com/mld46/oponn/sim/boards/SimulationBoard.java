@@ -760,17 +760,23 @@ public class SimulationBoard
 		int aArmies = countries[attackingCC].getArmies()-1;
 		int dArmies = countries[defendingCC].getArmies();
 		
-		if(!attackUntilDead)
+		if(attackUntilDead)
 		{
-			int participatingAttackers = Math.min(aArmies-attackerLosses,3);
-			int participatingDefenders = Math.min(dArmies-defenderLosses,2);
+			AttackOutcome ao = BattleSim.simulateBattle(aArmies,dArmies);
+			attackerLosses = ao.attackerLosses;
+			defenderLosses = ao.defenderLosses;
+		}
+		else
+		{
+			int participatingAttackers = Math.min(aArmies,3);
+			int participatingDefenders = Math.min(dArmies,2);
 			attackerLosses = BattleSim.simulateIndividualBattle(participatingAttackers,participatingDefenders);
 			defenderLosses = Math.min(participatingAttackers,participatingDefenders) - attackerLosses;
 		}
-		
-		AttackOutcome ao = BattleSim.simulateBattle(aArmies,dArmies);
-		attackerLosses = ao.attackerLosses;
-		defenderLosses = ao.defenderLosses;
+		if(attackerLosses < 0 || defenderLosses < 0)
+		{
+			System.out.println("Hmmm");
+		}
 	}
 	
 	protected void finishAttack()
@@ -778,7 +784,7 @@ public class SimulationBoard
 		Country attackingCountry = countries[attackingCC];
 		Country defendingCountry = countries[defendingCC];
 		
-		if(attackingCountry.getArmies() <= attackerLosses)
+		if(attackingCountry.getArmies()-attackerLosses < 1)
 		{
 			System.out.println("Hmm");
 		}
@@ -1194,6 +1200,11 @@ public class SimulationBoard
 	public String getSimAgentName(int player)
 	{
 		return simAgents[player].name();
+	}
+	
+	public String getAgentPath()
+	{
+		throw new IllegalArgumentException("SimBoard does not implement the method 'getAgentPath'");
 	}
 	
 	public boolean hasInvadedACountry()

@@ -6,25 +6,20 @@ public class Attack extends Move
 {
 	private final String attackerName;
 	public final int attackingCC;
-	public final short attackingArmies;
+	public final int attackingArmies;
 	private final String defenderName;
 	public final int defendingCC;
-	public final short defendingArmies;
+	public final int defendingArmies;
 	public final boolean attackUntilDead;
 	
 	public Attack(int attackerCC, int defenderCC, int attackerArmies, int defenderArmies, boolean attackUntilDead)
 	{
 		super(Phase.ATTACK);
 		
-		if(attackerArmies > Short.MAX_VALUE || defenderArmies > Short.MAX_VALUE)
-		{
-			throw new IllegalArgumentException("More than " + Short.MAX_VALUE + " armies on a country - Oponn not equipped to handle this situation!");
-		}
-		
 		this.attackingCC = attackerCC;
 		this.defendingCC = defenderCC;
-		this.attackingArmies = (short)attackerArmies;
-		this.defendingArmies = (short)defenderArmies;
+		this.attackingArmies = attackerArmies;
+		this.defendingArmies = defenderArmies;
 		this.attackUntilDead = attackUntilDead;
 		
 		this.attackerName = countries[attackerCC].getName();

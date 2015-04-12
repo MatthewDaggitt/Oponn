@@ -473,7 +473,7 @@ public class Oponn extends SimAgent
 		{
 			Debug.output("Settings detected", 0);
 			
-			br = new BufferedReader(new FileReader(new File("Oponn.txt")));
+			br = new BufferedReader(new FileReader(new File(getAgentPath()+"Oponn.txt")));
 			
 			String line = br.readLine();
 			while(line != null)

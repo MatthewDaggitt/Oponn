@@ -67,49 +67,76 @@ public class BattleSim
 	{
 		int attackerLosses = 0;
 		int defenderLosses = 0;
-		int remainingAttackers = attackers;
-		int remainingDefenders = defenders;
-		
-		if(remainingAttackers > 100 || remainingDefenders > 100)
-		{
-			int participatingAttackers, participatingDefenders;
-			int attackerLoss, defenderLoss;
-			
-			while((remainingAttackers > 100 || remainingDefenders > 100) && !(remainingAttackers == 0 || remainingDefenders == 0))
-			{
-				participatingAttackers = Math.min(remainingAttackers,3);
-				participatingDefenders = Math.min(remainingDefenders,2);
-				attackerLoss = simulateIndividualBattle(participatingAttackers,participatingDefenders);
-				defenderLoss = Math.min(participatingAttackers,participatingDefenders) - attackerLoss;
 				
-				attackerLosses += attackerLoss;
-				defenderLosses += defenderLoss;
-				remainingAttackers -= attackerLoss;
-				remainingDefenders -= defenderLoss;
-			}
-		}
-		
-		if(remainingAttackers != 0 && remainingDefenders != 0)
+		if(attackers > 500 && defenders > 500)
 		{
-			int key = szudzikMapping(remainingAttackers, remainingDefenders);
-					
-			AttackOutcome [] possibleResults = attackOutcomes.get(key);
-			if(possibleResults == null)
+			int matchedAttackers = (int) (0.922*defenders);
+			
+			if(matchedAttackers > attackers)
 			{
-				possibleResults = generateAttackOutcomes(remainingAttackers,remainingDefenders);
-				attackOutcomes.put(szudzikMapping(remainingAttackers, remainingDefenders), possibleResults);
+				attackerLosses = attackers;
+				
+				int variance = (int) (random.nextGaussian()*Math.sqrt(attackers));
+				defenderLosses = (int)Math.min(variance + attackers/0.922, defenders-1); 
+			}
+			else
+			{
+				defenderLosses = defenders;
+				
+				int variance = (int) (random.nextGaussian()*Math.sqrt(defenders));
+				attackerLosses = Math.min(variance + matchedAttackers, attackers-1);
+			}
+			if(attackerLosses < 0 || defenderLosses < 0)
+			{
+				System.out.println(attackers + " attackers (lost " + attackerLosses + ") against " + defenders + " defenders (lost " + defenderLosses + ")");
+			}	
+		}
+		else
+		{
+			int remainingAttackers = attackers;
+			int remainingDefenders = defenders;
+			
+			if(remainingAttackers > 100 || remainingDefenders > 100)
+			{
+				int participatingAttackers, participatingDefenders;
+				int attackerLoss, defenderLoss;
+				
+				while((remainingAttackers > 100 || remainingDefenders > 100) && !(remainingAttackers == 0 || remainingDefenders == 0))
+				{
+					participatingAttackers = Math.min(remainingAttackers,3);
+					participatingDefenders = Math.min(remainingDefenders,2);
+					attackerLoss = simulateIndividualBattle(participatingAttackers,participatingDefenders);
+					defenderLoss = Math.min(participatingAttackers,participatingDefenders) - attackerLoss;
+					
+					attackerLosses += attackerLoss;
+					defenderLosses += defenderLoss;
+					remainingAttackers -= attackerLoss;
+					remainingDefenders -= defenderLoss;
+				}
 			}
 			
-			double r = random.nextDouble();
-			double total = 0;
-			for(AttackOutcome ao : possibleResults)
+			if(remainingAttackers != 0 && remainingDefenders != 0)
 			{
-				total += ao.probability;
-				if(r <= total)
+				int key = szudzikMapping(remainingAttackers, remainingDefenders);
+						
+				AttackOutcome [] possibleResults = attackOutcomes.get(key);
+				if(possibleResults == null)
 				{
-					attackerLosses += ao.attackerLosses;
-					defenderLosses += ao.defenderLosses;
-					break;
+					possibleResults = generateAttackOutcomes(remainingAttackers,remainingDefenders);
+					attackOutcomes.put(szudzikMapping(remainingAttackers, remainingDefenders), possibleResults);
+				}
+				
+				double r = random.nextDouble();
+				double total = 0;
+				for(AttackOutcome ao : possibleResults)
+				{
+					total += ao.probability;
+					if(r <= total)
+					{
+						attackerLosses += ao.attackerLosses;
+						defenderLosses += ao.defenderLosses;
+						break;
+					}
 				}
 			}
 		}
@@ -124,7 +151,7 @@ public class BattleSim
 	 */
 	public static int simulateIndividualBattle(int attackers, int defenders)
 	{
-		if(attackers > 3 || defenders > 2)
+		if(attackers > 3 || defenders > 2 || attackers < 1 || defenders < 1)
 		{
 			throw new IllegalArgumentException("Error: " + attackers + ":" + defenders);
 		}
@@ -132,25 +159,6 @@ public class BattleSim
 		double r = random.nextDouble();
 		double [] distribution = outcomes[(attackers-1)*2 + (defenders-1)];
 		return (r <= distribution[0] ? 0 : (r <= distribution[1] ? 1 : 2));
-	}
-	
-	public static AttackOutcome simulateBattleLonghand(int attackers, int defenders)
-	{
-		int attackerLosses = 0;
-		int defenderLosses = 0;
-		
-		while(attackerLosses < attackers && defenderLosses < defenders)
-		{
-			int participatingAttackers = Math.min(attackers - attackerLosses, 3);
-			int participatingDefenders = Math.min(defenders - defenderLosses, 2);
-			int attackerLoss = simulateIndividualBattle(participatingAttackers,participatingDefenders);
-			int defenderLoss = Math.min(participatingAttackers,participatingDefenders) - attackerLoss;
-			
-			attackerLosses += attackerLoss;
-			defenderLosses += defenderLoss;
-		}
-		
-		return new AttackOutcome(attackerLosses, defenderLosses, Float.NaN, false);
 	}
 	
 	public static boolean favourableForAttacker(int freeAttackers, int defenders)

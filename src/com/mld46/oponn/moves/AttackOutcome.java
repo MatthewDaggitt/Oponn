@@ -5,16 +5,16 @@ import com.mld46.oponn.sim.boards.SimulationBoard.Phase;
 public class AttackOutcome extends Move implements Comparable<AttackOutcome>
 {
 	public final float probability;
-	public final short attackerLosses;
-	public final short defenderLosses;
+	public final int attackerLosses;
+	public final int defenderLosses;
 	public final boolean invading;
 	
 	public AttackOutcome(int attackerLosses, int defenderLosses, float probability, boolean invading)
 	{
 		super(Phase.ATTACK);
 		this.probability = probability;
-		this.attackerLosses = (short) attackerLosses;
-		this.defenderLosses = (short) defenderLosses;
+		this.attackerLosses = attackerLosses;
+		this.defenderLosses = defenderLosses;
 		this.invading = invading;
 	}
 	
