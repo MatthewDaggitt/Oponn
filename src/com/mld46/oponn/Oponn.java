@@ -443,7 +443,7 @@ public class Oponn extends SimAgent
 		setup();
 		
 		// For variety we store a bunch of answers and pick one at random to return.
-		String[] answers = new String[] {"Random!"};
+		String[] answers = new String[] {"Push and pull, push and pull..."};
 		Random rand = new Random();
 		
 		return answers[rand.nextInt(answers.length)];
